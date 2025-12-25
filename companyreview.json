@@ -1,0 +1,55 @@
+[
+    {
+        "company_name": "Google",
+        "service_name": "Google Calendar",
+        "review": "I've been using Google calendar for about 20 years and it really has not had a lot of improvements. It is straightforward but it is not growing with the times."
+    },
+
+    {
+        "company_name": "Google",
+        "service_name": "Google Calendar",
+        "review": "Overall, my experience is positive as I love the reminders for events that are on the calendar and the ability for others to add to ours from another office."
+    },
+
+    {
+        "company_name": "Google",
+        "service_name": "Google Calendar",
+        "review": "Overall really like the app and have been using it more and more even in my personal life to keep organized. I like that you can integrate multiple accounts. I do wish it could sync with teams calendar but I don't think that is currently an option."
+    },
+
+    {
+        "company_name": "Google",
+        "service_name": "Google Calendar",
+        "review": "Overall, Google Calendar is very helpful for my day-to-day work, especially since I have many weekly meetings to manage. The integration with Google Meet is also a big plus for remote meetings."
+    },
+
+    {
+        "company_name": "Google",
+        "service_name": "Google Calendar",
+        "review": "Overall I enjoy using Google Calendar for work appointments. It helps keeps things organized and visible for me."
+    },
+
+    {
+        "company_name": "Google",
+        "service_name": "Google Calendar",
+        "review": "I will keep using it because it solves a lot of Microsoft problems for me. I can get it on any device even the internet if I had to. So overall, it is a tool in my toolbox."
+    },
+
+    {
+        "company_name": "Google",
+        "service_name": "Google Calendar",
+        "review": "Great untill new update, now horrible, will now try and find other options for all google apps."
+    },
+
+    {
+        "company_name": "Google",
+        "service_name": "Google Calendar",
+        "review": "I began using the google calendar years ago, but have since stopped once I missed a few appointments because it wasn’t signed into the right account."
+    },
+
+    {
+        "company_name": "Google",
+        "service_name": "Google Calendar",
+        "review": "I may be in the minority here, but I think the interface and usability of Google Calendar is horrible. I find the interface confusing and the mechanism/appearance of invitations and related acceptances terrible. This is consistent with gmail, which I find to be quite counterintuitive as an interface compared to Outlook."
+    }
+]
