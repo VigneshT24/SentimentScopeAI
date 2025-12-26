@@ -98,7 +98,6 @@ Cross-Review Aggregation
 SentimentScopeAI/
 │
 ├── sentimentscopeAI.py        # Core sentiment + inference logic
-├── companyreviews.json        # Sample review dataset
 ├── README.md                  # Documentation
 └── requirements.txt           # Dependencies (PyTorch, Transformers)
 ```
