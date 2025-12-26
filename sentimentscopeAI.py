@@ -6,9 +6,6 @@ import random
 import textwrap
 from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM, T5Tokenizer, set_seed)
 
-## TODO: Once you get the average semantic rating, do the following:
-##       1.) Pinpoint areas to improve by tokenizing & parsing the reviews
-
 class SentimentScopeAI:
     ## Private attributes
     __hf_model_name = None
@@ -54,7 +51,7 @@ class SentimentScopeAI:
 
     @property
     def pytorch_model(self):
-        """Lazy loader for the Pytorch Model"""
+        """Lazy loader for the Pytorch Model."""
         if self.__pytorch_model is None:
             print(f"Loading BERT Model onto {self.__device}...")
             self.__pytorch_model = AutoModelForSequenceClassification.from_pretrained(
