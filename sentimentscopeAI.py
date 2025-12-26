@@ -54,7 +54,7 @@ class SentimentScopeAI:
 
     @property
     def pytorch_model(self):
-        """Lazy loader for the Pytorch Model"""
+        """Lazy loader for the Pytorch Model."""
         if self.__pytorch_model is None:
             print(f"Loading BERT Model onto {self.__device}...")
             self.__pytorch_model = AutoModelForSequenceClassification.from_pretrained(
