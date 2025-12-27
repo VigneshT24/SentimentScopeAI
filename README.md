@@ -3,7 +3,7 @@
 
 SentimentScopeAI is a Python-based NLP system that leverages PyTorch and HuggingFace Transformers (pre-trained models) to move beyond binary sentiment classification and instead analyze, interpret, and reason over collections of user reviews to help companies improve their products/services
 
-Rather than treating sentiment analysis as a black-box prediction task, this project focuses on semantic interpretation, explainability, and aggregated insight generation, simulating how a human analyst would read and summarize large volumes of feedback.
+Rather than treating sentiment analysis as a black-box prediction task, this project focuses on semantic interpretation, explainability, and the generation of aggregated insights, simulating how a human analyst would read and summarize large volumes of feedback.
 
 ## Project Motivation
 
@@ -12,7 +12,7 @@ SentimentScopeAI is designed to answer deeper, more practical questions:
 * How consistent are opinions across many reviews?
 * What actionable advice can be derived from collective sentiment?
 
-## Current Features & Progress
+## Features
 
 1.) Pre-Trained Sentiment Modeling (PyTorch + HuggingFace)
 * Uses pre-trained transformer models from HuggingFace
@@ -49,19 +49,26 @@ Rating: 3
 * Model outputs are interpreted rather than blindly trusted
 * Designed for debugging, auditing, and future research extension
 
-## Future Features/In Progress
-
-5.) Cross-Review Advice Generation (Next Milestone)
+5.) Cross-Review Advice Generation
 * Read all reviews for a given product or service
 * Aggregate sentiment signals across users
 * Detect recurring strengths and weaknesses
 * Generate actionable advice for stakeholders
 
-This step transitions the system from analysis → reasoning → recommendation generation.
+These steps transition the system from analysis → reasoning → recommendation generation.
 
 Example:
 ```
-"Users consistently praise ease of use and reliability, but repeatedly mention slow customer support. Improving response times would likely increase overall satisfaction."
+For <Service Name>: overall sentiment is mixed reflecting a balance
+of positive and negative feedback
+
+The following specific issues were extracted from negative reviews:
+
+1) missed a few appointments
+2) not signed into the right account
+3) interface is horrible
+4) find the interface confusing
+5) invitations and acceptances are terrible
 ```
 
 ## System Architecture Overview
@@ -77,14 +84,14 @@ Rating Meaning Inference
   ↓
 Cross-Review Aggregation
   ↓
-(Upcoming) Advice Generation
+Advice Generation
 ```
 
 ## Tech-Stack
 
 * **Language**: Python
 * **Deep Learning**: PyTorch
-* **NLP Models**: HuggingFace Transformers (pre-trained)
+* **NLP Models**: HuggingFace Transformers (pre-trained), Flan-T5
 * **Concepts**:
   * Sentiment analysis
   * Semantic interpretation
@@ -104,12 +111,119 @@ SentimentScopeAI/
 
 ## Why SentimentScopeAI?
 
-This project demonstrates:
+Every organization collects feedback - but reading hundreds or thousands of reviews is time-consuming, inconsistent, and difficult to scale. Important insights are often buried in repetitive comments, while actionable criticism gets overlooked.
 
-* Practical use of PyTorch and HuggingFace Transformers
-* Understanding of NLP beyond basic classification
-* Emphasis on interpretability and explainable reasoning
-* Strong software design with modular, ML-ready architecture
-* Ability to translate raw model outputs into actionable insights
+SentimentScopeAI is designed to do the heavy lifting:
+* Reads and analyzes large volumes of reviews automatically
+* Identifies recurring pain points across users
+* Distills unstructured feedback into clear, constructive, and actionable advice
+* Helps teams focus on what to improve rather than sorting through raw text
 
-It reflects real-world sentiment analysis workflows used in product analytics, UX research, and AI-driven decision systems.
+## Installation & Usage
+
+SentimentScopeAI is distributed as a Python package and can be installed via pip:
+
+```
+pip install sentimentscopeai
+```
+
+Requirements:
+* Python 3.9 or newer (Python 3.10 or above is recommended for best performance and compatibility)
+* PyTorch
+* HuggingFace Transformers
+* Internet connection on first run (to download pre-trained models)
+
+All required dependencies are automatically installed with the package.
+
+## Basic Usage:
+
+```python
+from sentimentscopeai import SentimentScopeAI
+
+# MAKE SURE TO PASS IN: current_folder/json_file_name, not just json_file_name
+review_bot = ssAI.SentimentScopeAI("Testing/companyreview.json")
+
+print(review_bot.generate_summary())
+```
+
+What Happens Internally
+
+* Reviews are parsed from a structured JSON file
+* Sentiment is inferred using pre-trained transformer models (PyTorch + HuggingFace)
+* Rating meanings are semantically interpreted
+* Flan-T5 generates human-readable, actionable advice based on aggregated feedback
+
+## IMPORTANT NOTICE:
+
+1.) Strict JSON Input Format (Required)
+
+SentimentScopeAI only accepts JSON input.
+The review file must follow this exact structure:
+
+```json
+[
+  {
+    "company_name": "Company Name",
+    "service_name": "Product or Service Name",
+    "review": "Full user review text goes here."
+  },
+  {
+    "company_name": "Company Name",
+    "service_name": "Product or Service Name",
+    "review": "Another review text."
+  }
+]
+```
+
+Missing fields, incorrect keys, or non-JSON formats will cause parsing errors.
+
+2.) JSON Must Be Valid
+
+* File must be UTF-8 encoded
+* No trailing commas
+* No comments
+* Must be a list ([]), not a single object
+
+You can use a JSON validator if you are unsure.
+
+3.) One Company & One Service per JSON File (Required)
+
+EXAMPLE:
+```json
+[
+  {
+    "company_name": "Google",
+    "service_name": "Google Calendar",
+    "review": "The interface is clean and easy to use."
+  },
+  {
+    "company_name": "Google",
+    "service_name": "Google Calendar",
+    "review": "Reminders are helpful, but syncing can be slow."
+  }
+]
+```
+
+This restriction is intentional:
+
+* Sentiment aggregation assumes a single shared context
+* Advice generation relies on consistent product-level patterns
+* Mixing services can produce misleading summaries and recommendations
+
+If you need to analyze multiple products or companies, create separate JSON files and run SentimentScopeAI independently for each dataset.
+
+4.) Model Loading Behavior
+
+* Transformer models are lazy-loaded
+* First run may take longer due to:
+  * Model downloads
+  * Tokenizer initialization
+* Subsequent runs are significantly faster
+
+This design improves startup efficiency and memory usage.
+
+
+**SentimentScopeAI is provided as-is and is not liable for any damages arising from its use.
+Do not include personal, sensitive, or confidential information in review data.
+All input data is processed locally and is not used for model training or retained beyond execution.
+Users are responsible for ensuring ethical and appropriate use of the system.**
