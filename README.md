@@ -3,7 +3,7 @@
 
 SentimentScopeAI is a Python-based NLP system that leverages PyTorch and HuggingFace Transformers (pre-trained models) to move beyond binary sentiment classification and instead analyze, interpret, and reason over collections of user reviews to help companies improve their products/services
 
-Rather than treating sentiment analysis as a black-box prediction task, this project focuses on semantic interpretation, explainability, and aggregated insight generation, simulating how a human analyst would read and summarize large volumes of feedback.
+Rather than treating sentiment analysis as a black-box prediction task, this project focuses on semantic interpretation, explainability, and the generation of aggregated insights, simulating how a human analyst would read and summarize large volumes of feedback.
 
 ## Project Motivation
 
@@ -12,7 +12,7 @@ SentimentScopeAI is designed to answer deeper, more practical questions:
 * How consistent are opinions across many reviews?
 * What actionable advice can be derived from collective sentiment?
 
-## Current Features & Progress
+## Features
 
 1.) Pre-Trained Sentiment Modeling (PyTorch + HuggingFace)
 * Uses pre-trained transformer models from HuggingFace
@@ -49,9 +49,7 @@ Rating: 3
 * Model outputs are interpreted rather than blindly trusted
 * Designed for debugging, auditing, and future research extension
 
-## Future Features/In Progress
-
-5.) Cross-Review Advice Generation (Next Milestone)
+5.) Cross-Review Advice Generation
 * Read all reviews for a given product or service
 * Aggregate sentiment signals across users
 * Detect recurring strengths and weaknesses
@@ -61,7 +59,16 @@ This step transitions the system from analysis → reasoning → recommendation 
 
 Example:
 ```
-"Users consistently praise ease of use and reliability, but repeatedly mention slow customer support. Improving response times would likely increase overall satisfaction."
+For Google Calendar: overall sentiment is mixed reflecting a balance
+of positive and negative feedback
+
+The following specific issues were extracted from negative reviews:
+
+1) missed a few appointments
+2) not signed into the right account
+3) interface is horrible
+4) find the interface confusing
+5) invitations and acceptances are terrible
 ```
 
 ## System Architecture Overview
@@ -77,14 +84,14 @@ Rating Meaning Inference
   ↓
 Cross-Review Aggregation
   ↓
-(Upcoming) Advice Generation
+Advice Generation
 ```
 
 ## Tech-Stack
 
 * **Language**: Python
 * **Deep Learning**: PyTorch
-* **NLP Models**: HuggingFace Transformers (pre-trained)
+* **NLP Models**: HuggingFace Transformers (pre-trained), Flan-T5
 * **Concepts**:
   * Sentiment analysis
   * Semantic interpretation
