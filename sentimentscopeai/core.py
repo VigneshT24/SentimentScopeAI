@@ -295,8 +295,7 @@ class SentimentScopeAI:
         sentiment rating, and produces a structured, human-readable summary.
         The summary includes:
             - A concise explanation of the inferred sentiment rating
-            - A numbered list of representative negative reviews (up to 3)
-            - A numbered list of representative positive reviews (up to 3)
+            - A numbered list of representative negatives mentioned
 
         Long-form reviews are wrapped to a fixed line width while preserving
         list structure and readability.
