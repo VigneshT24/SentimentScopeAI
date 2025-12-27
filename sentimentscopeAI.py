@@ -5,7 +5,7 @@ import string
 import random
 import textwrap
 import spacy
-from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM, T5Tokenizer, set_seed)
+from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM, T5ForConditionalGeneration, T5Tokenizer, set_seed)
 
 class SentimentScopeAI:
     ## Private attributes
@@ -20,12 +20,14 @@ class SentimentScopeAI:
     __service_name = None
     __device = None
     __notable_negatives = []
-    __notable_positives = []
+    __extraction_model = None
+    __extraction_tokenizer = None
 
     def __init__(self, file_path):
         """Initialize the SentimentScopeAI class with the specified JSON file path."""
         self.__hf_model_name = "Vamsi/T5_Paraphrase_Paws"
         self.__pytorch_model_name = "nlptown/bert-base-multilingual-uncased-sentiment"
+        self.__extraction_model_name = "google/flan-t5-large"
         self.__json_file_path = os.path.abspath(file_path)
         self.__device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -65,6 +67,24 @@ class SentimentScopeAI:
         if self.__spacy_nlp is None:
             self.__spacy_nlp = spacy.load("en_core_web_sm")
         return self.__spacy_nlp
+    
+    @property
+    def extraction_model(self):
+        """Lazy loader for the Flan-T5 extraction model."""
+        if self.__extraction_model is None:
+            self.__extraction_model = T5ForConditionalGeneration.from_pretrained(
+                self.__extraction_model_name
+            ).to(self.__device)
+        return self.__extraction_model
+
+    @property
+    def extraction_tokenizer(self):
+        """Lazy loader for the Flan-T5 tokenizer."""
+        if self.__extraction_tokenizer is None:
+            self.__extraction_tokenizer = AutoTokenizer.from_pretrained(
+                self.__extraction_model_name
+            )
+        return self.__extraction_tokenizer
 
     def __get_predictive_star(self, text) -> int:
         """
@@ -75,7 +95,7 @@ class SentimentScopeAI:
             Returns:
                 int: The predicted star rating (1 to 5).
         """
-        inputs = self.pytorch_tokenizer(text, return_tensors="pt")
+        inputs = self.pytorch_tokenizer(text, return_tensors="pt").to(self.__device)
 
         with torch.no_grad():
             outputs = self.pytorch_model(**inputs)
@@ -102,10 +122,6 @@ class SentimentScopeAI:
                 num_reviews = 0
                 for i, entry in enumerate(all_reviews, 1):
                     single_review_rating = self.__get_predictive_star(entry['review'])
-                    if single_review_rating <= 2:
-                        self.__notable_negatives.append(entry['review'])
-                    elif single_review_rating >= 4:
-                        self.__notable_positives.append(entry['review'])
                     sum += single_review_rating
                     self.__service_name = entry['service_name']
                     num_reviews = i
@@ -197,6 +213,74 @@ class SentimentScopeAI:
             return generate_sentence("Overall sentiment is positive, indicating general user satisfaction.")
         else:
             return generate_sentence("Overall sentiment is very positive, reflecting strong user approval and satisfaction.")
+
+    def __extract_negative_aspects(self, review: str) -> list[str]:
+        """
+        Extract actionable negative aspects from a review using AI-based text generation.
+        
+        This method uses the Flan-T5 language model to identify specific, constructive
+        problems mentioned in a review. Unlike simple sentiment analysis, this extracts
+        concrete issues that describe what is broken, missing, or difficult - filtering
+        out vague emotional words like "horrible" or "bad".
+        
+        The extraction focuses on actionable feedback that can help improve a product
+        or service, such as "notifications arrive at wrong times" rather than just
+        "notifications are bad".
+        
+        Args:
+            review (str): The review text to analyze for negative aspects.
+        
+        Returns:
+            list[str]: A list of specific problem phrases extracted from the review.
+                    Each phrase describes a concrete issue. Returns an empty list
+                    if the review is empty, contains only whitespace, or no 
+                    problems are identified.
+        
+        Note:
+            This method uses the Flan-T5 model which is loaded lazily on first use.
+            Processing time depends on review length and available hardware (CPU/GPU).
+            Very short outputs (≤3 characters) are filtered out as likely artifacts.
+        """
+        if not review or review.isspace():
+            return []
+        
+        prompt = f"""What problems does this review mention? List each as a brief phrase.
+        Each problem should be describing what is wrong, DON'T OUTPUT one word lines like "horrible" or "bad".
+        Make sure they are CONSTRUCTIVE CRITICISM THAT CAN HELP SOMEONE IMPROVE
+
+        Review: {review}
+
+        Problems mentioned:"""
+
+        inputs = self.extraction_tokenizer(
+            prompt, 
+            return_tensors="pt",
+            max_length=512,
+            truncation=True
+        ).to(self.__device)
+
+        outputs = self.extraction_model.generate(
+            **inputs,
+            max_length=150,
+            num_beams=4,
+            temperature=0.7,
+            do_sample=True,
+            top_p=0.9,
+            early_stopping=True
+        )
+
+        result = self.extraction_tokenizer.decode(outputs[0], skip_special_tokens=True)
+        if result.strip().lower() in ['none', 'none.', 'no problems', '']:
+            return[]
+        
+        issues = []
+        for line in result.split('\n'):
+            line = line.strip()
+            line = line.lstrip('•-*1234567890.) ')
+            if line and len(line) > 3:
+                issues.append(line)
+        
+        return issues
     
     def output_all_reviews(self) -> None:
         """
@@ -258,6 +342,9 @@ class SentimentScopeAI:
             with open(self.__json_file_path, 'r') as file:
                 company_reviews = json.load(file)
                 for i, entry in enumerate(company_reviews, 1):
+                    if self.__get_predictive_star(entry['review']) <= 2:
+                        for part in self.__extract_negative_aspects(entry['review']):
+                            self.__notable_negatives.append(part)
                     self.__service_name = entry['service_name']
                     reviews.append(entry['review'])
         except FileNotFoundError:
@@ -285,19 +372,11 @@ class SentimentScopeAI:
             return "\n".join(lines)
 
         rating_meaning = self.__infer_rating_meaning()
-
-        if len(self.__notable_negatives) > 3:
-            self.__notable_negatives = random.sample(self.__notable_negatives, 3)
-        
-        if len(self.__notable_positives) > 3:
-            self.__notable_positives = random.sample(self.__notable_positives, 3)
             
         parts = [
             textwrap.fill(rating_meaning, width=70),
             textwrap.fill("The following reviews highlight some concerns users have expressed:", width=70),
-            format_numbered_list(self.__notable_negatives),
-            textwrap.fill("In contrast, these reviews capture the aspects users consistently appreciate:", width=70),
-            format_numbered_list(self.__notable_positives) + ".",
+            format_numbered_list(self.__notable_negatives)
         ]
 
         return "\n\n".join(parts)
