@@ -4,6 +4,7 @@ import os
 import string
 import random
 import textwrap
+import spacy
 from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM, T5Tokenizer, set_seed)
 
 class SentimentScopeAI:
@@ -14,23 +15,24 @@ class SentimentScopeAI:
     __pytorch_model_name = None
     __pytorch_tokenizer = None
     __pytorch_model = None
+    __spacy_nlp = None
     __json_file_path = None
     __service_name = None
     __device = None
+    __notable_negatives = []
+    __notable_positives = []
 
     def __init__(self, file_path):
         """Initialize the SentimentScopeAI class with the specified JSON file path."""
         self.__hf_model_name = "Vamsi/T5_Paraphrase_Paws"
         self.__pytorch_model_name = "nlptown/bert-base-multilingual-uncased-sentiment"
-        base_dir = os.path.dirname(__file__)
-        self.__json_file_path = os.path.join(base_dir, file_path)
+        self.__json_file_path = os.path.abspath(file_path)
         self.__device = "cuda" if torch.cuda.is_available() else "cpu"
 
     @property
     def hf_model(self):
         """Lazy loader for the Paraphrase Model."""
         if self.__hf_model is None:
-            print("Loading T5 Paraphrase Model for the first time...")
             self.__hf_model = AutoModelForSeq2SeqLM.from_pretrained(self.__hf_model_name)
         return self.__hf_model
 
@@ -43,21 +45,26 @@ class SentimentScopeAI:
 
     @property
     def pytorch_tokenizer(self):
-        """Lazy loader for the Pytorch Tokenizer."""
+        """Lazy loader for the PyTorch Tokenizer."""
         if self.__pytorch_tokenizer is None:
-            print(f"Loading BERT Tokenizer...")
             self.__pytorch_tokenizer = AutoTokenizer.from_pretrained(self.__pytorch_model_name)
         return self.__pytorch_tokenizer
 
     @property
     def pytorch_model(self):
-        """Lazy loader for the Pytorch Model."""
+        """Lazy loader for the PyTorch Model."""
         if self.__pytorch_model is None:
-            print(f"Loading BERT Model onto {self.__device}...")
             self.__pytorch_model = AutoModelForSequenceClassification.from_pretrained(
                 self.__pytorch_model_name
             ).to(self.__device)
         return self.__pytorch_model
+
+    @property
+    def spacy_model(self):
+        """Lazy loader for the Spacy NLP."""
+        if self.__spacy_nlp is None:
+            self.__spacy_nlp = spacy.load("en_core_web_sm")
+        return self.__spacy_nlp
 
     def __get_predictive_star(self, text) -> int:
         """
@@ -78,33 +85,6 @@ class SentimentScopeAI:
 
         num_star = prediction + 1
         return num_star
-    
-    def output_all_reviews(self) -> None:
-        """
-            Output all reviews from the JSON file in a formatted manner.
-
-            Args:
-                None
-            Returns:
-                None
-        """
-        try:
-            with open(self.__json_file_path, 'r') as file:
-                company_reviews = json.load(file)
-                for i, entry in enumerate(company_reviews, 1):
-                    print(f"Review #{i}")
-                    print(f"Company Name: {entry['company_name']}")
-                    print(f"Service Name: {entry['service_name']}")
-                    print(f"Review: {textwrap.fill(entry['review'], width=70)}")
-                    print("\n\n")
-        except FileNotFoundError:
-            print("The JSON file you inputted doesn't exist. Please input a valid company review file.")
-        except json.JSONDecodeError:
-            print("Could not decode JSON file. Check for valid JSON syntax.")
-        except PermissionError:
-            print("Permission denied to open the JSON file.")
-        except Exception as e:
-            print(f"An unexpected error occured: {e}")
 
     def __calculate_all_review(self) -> int:
         """
@@ -121,7 +101,12 @@ class SentimentScopeAI:
                 sum = 0
                 num_reviews = 0
                 for i, entry in enumerate(all_reviews, 1):
-                    sum += self.__get_predictive_star(entry['review'])
+                    single_review_rating = self.__get_predictive_star(entry['review'])
+                    if single_review_rating <= 2:
+                        self.__notable_negatives.append(entry['review'])
+                    elif single_review_rating >= 4:
+                        self.__notable_positives.append(entry['review'])
+                    sum += single_review_rating
                     self.__service_name = entry['service_name']
                     num_reviews = i
             return (sum / num_reviews) if num_reviews != 0 else 0
@@ -184,9 +169,8 @@ class SentimentScopeAI:
             unique.append(set_sentence)
 
         return unique
-
-
-    def infer_rating_meaning(self) -> str:
+    
+    def __infer_rating_meaning(self) -> str:
         """Translates numerical rating scores into descriptive, paraphrased sentiment.
 
         Calculates the aggregate review score and maps it to a sentiment category 
@@ -213,3 +197,107 @@ class SentimentScopeAI:
             return generate_sentence("Overall sentiment is positive, indicating general user satisfaction.")
         else:
             return generate_sentence("Overall sentiment is very positive, reflecting strong user approval and satisfaction.")
+    
+    def output_all_reviews(self) -> None:
+        """
+            Output all reviews from the JSON file in a formatted manner.
+
+            Args:
+                None
+            Returns:
+                None
+        """
+        try:
+            with open(self.__json_file_path, 'r') as file:
+                company_reviews = json.load(file)
+                for i, entry in enumerate(company_reviews, 1):
+                    print(f"Review #{i}")
+                    print(f"Company Name: {entry['company_name']}")
+                    print(f"Service Name: {entry['service_name']}")
+                    print(f"Review: {textwrap.fill(entry['review'], width=70)}")
+                    print("\n\n")
+        except FileNotFoundError:
+            print("The JSON file you inputted doesn't exist. Please input a valid company review file.")
+        except json.JSONDecodeError:
+            print("Could not decode JSON file. Check for valid JSON syntax.")
+        except PermissionError:
+            print("Permission denied to open the JSON file.")
+        except Exception as e:
+            print(f"An unexpected error occured: {e}")
+
+    def generate_summary(self) -> str:
+        """
+        Generate a formatted sentiment summary based on user reviews for a service.
+
+        This method reads a JSON file containing user reviews, infers the overall
+        sentiment rating, and produces a structured, human-readable summary.
+        The summary includes:
+            - A concise explanation of the inferred sentiment rating
+            - A numbered list of representative negative reviews (up to 3)
+            - A numbered list of representative positive reviews (up to 3)
+
+        Long-form reviews are wrapped to a fixed line width while preserving
+        list structure and readability.
+
+        The method is resilient to common file and parsing errors and will
+        emit descriptive messages if the input file cannot be accessed or
+        decoded properly.
+
+        Returns:
+            str
+                A multi-paragraph, text-wrapped sentiment summary suitable for
+                console output, logs, or reports.
+
+        Raises:
+            None
+                All exceptions are handled internally with descriptive error
+                messages to prevent interruption of execution.
+        """
+        try:
+            reviews = []
+            with open(self.__json_file_path, 'r') as file:
+                company_reviews = json.load(file)
+                for i, entry in enumerate(company_reviews, 1):
+                    self.__service_name = entry['service_name']
+                    reviews.append(entry['review'])
+        except FileNotFoundError:
+            print("The JSON file you inputted doesn't exist. Please input a valid company review file.")
+        except json.JSONDecodeError:
+            print("Could not decode JSON file. Check for valid JSON syntax.")
+        except PermissionError:
+            print("Permission denied to open the JSON file.")
+        except Exception as e:
+            print(f"An unexpected error occured: {e}")
+
+        def format_numbered_list(items):
+            if not items:
+                return "None found"
+
+            lines = []
+            for i, item in enumerate(items, start=1):
+                prefix = f"{i}) "
+                wrapper = textwrap.TextWrapper(
+                    width=70,
+                    initial_indent=prefix,
+                    subsequent_indent=" " * len(prefix) + "   "
+                )
+                lines.append(wrapper.fill(str(item)))
+            return "\n".join(lines)
+
+        rating_meaning = self.__infer_rating_meaning()
+
+        if len(self.__notable_negatives) > 3:
+            self.__notable_negatives = random.sample(self.__notable_negatives, 3)
+        
+        if len(self.__notable_positives) > 3:
+            self.__notable_positives = random.sample(self.__notable_positives, 3)
+            
+        parts = [
+            textwrap.fill(rating_meaning, width=70),
+            textwrap.fill("The following reviews highlight some concerns users have expressed:", width=70),
+            format_numbered_list(self.__notable_negatives),
+            textwrap.fill("In contrast, these reviews capture the aspects users consistently appreciate:", width=70),
+            format_numbered_list(self.__notable_positives) + ".",
+        ]
+
+        return "\n\n".join(parts)
