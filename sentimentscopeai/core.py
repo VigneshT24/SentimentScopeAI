@@ -106,25 +106,17 @@ class SentimentScopeAI:
             Returns:
                 tuple: A tuple containing the total number of reviews and the average star rating.
         """
-        try:
-            with open(self.__json_file_path, 'r') as reviews_file:
-                all_reviews = json.load(reviews_file)
-                sum = 0
-                num_reviews = 0
-                for i, entry in enumerate(all_reviews, 1):
-                    single_review_rating = self.__get_predictive_star(entry['review'])
-                    sum += single_review_rating
-                    self.__service_name = entry['service_name']
-                    num_reviews = i
-            return (sum / num_reviews) if num_reviews != 0 else 0
-        except FileNotFoundError:
-            print("The JSON file you inputted doesn't exist. Please input a valid company review file.")
-        except json.JSONDecodeError:
-            print("Could not decode JSON file. Check for valid JSON syntax.")
-        except PermissionError:
-            print("Permission denied to open the JSON file.")
-        except Exception as e:
-            print(f"An unexpected error occured: {e}")
+        # don't need try-catch because it is handled in generate_summary()
+        with open(self.__json_file_path, 'r') as reviews_file:
+            all_reviews = json.load(reviews_file)
+            sum = 0
+            num_reviews = 0
+            for i, entry in enumerate(all_reviews, 1):
+                single_review_rating = self.__get_predictive_star(entry['review'])
+                sum += single_review_rating
+                self.__service_name = entry['service_name']
+                num_reviews = i
+        return (sum / num_reviews) if num_reviews != 0 else 0
     
     def __paraphrase_statement(self, statement: str) -> list[str]:
         """Generates multiple unique paraphrased variations of a given string.
@@ -190,6 +182,9 @@ class SentimentScopeAI:
                 overall service sentiment.
         """
         overall_rating = self.__calculate_all_review()
+
+        if overall_rating is None:
+            return "JSON FILE PATH IS UNIDENTIFIABLE, please try inputting the name properly (e.g. \"companyreview.json\")."
 
         def generate_sentence(rating_summ):
             return f"For {self.__service_name}: " + random.choice(self.__paraphrase_statement(rating_summ)).strip()
@@ -282,23 +277,15 @@ class SentimentScopeAI:
             Returns:
                 None
         """
-        try:
-            with open(self.__json_file_path, 'r') as file:
-                company_reviews = json.load(file)
-                for i, entry in enumerate(company_reviews, 1):
-                    print(f"Review #{i}")
-                    print(f"Company Name: {entry['company_name']}")
-                    print(f"Service Name: {entry['service_name']}")
-                    print(f"Review: {textwrap.fill(entry['review'], width=70)}")
-                    print("\n\n")
-        except FileNotFoundError:
-            print("The JSON file you inputted doesn't exist. Please input a valid company review file.")
-        except json.JSONDecodeError:
-            print("Could not decode JSON file. Check for valid JSON syntax.")
-        except PermissionError:
-            print("Permission denied to open the JSON file.")
-        except Exception as e:
-            print(f"An unexpected error occured: {e}")
+        # don't need try-catch because it is handled in generate_summary()
+        with open(self.__json_file_path, 'r') as file:
+            company_reviews = json.load(file)
+            for i, entry in enumerate(company_reviews, 1):
+                print(f"Review #{i}")
+                print(f"Company Name: {entry['company_name']}")
+                print(f"Service Name: {entry['service_name']}")
+                print(f"Review: {textwrap.fill(entry['review'], width=70)}")
+                print("\n\n")
 
     def generate_summary(self) -> str:
         """
@@ -339,13 +326,13 @@ class SentimentScopeAI:
                     self.__service_name = entry['service_name']
                     reviews.append(entry['review'])
         except FileNotFoundError:
-            print("The JSON file you inputted doesn't exist. Please input a valid company review file.")
+            return ("JSON FILE PATH IS UNIDENTIFIABLE, please try inputting the name properly (e.g. \"companyreview.json\").")
         except json.JSONDecodeError:
-            print("Could not decode JSON file. Check for valid JSON syntax.")
+            return ("Could not decode JSON file. Check for valid JSON syntax.")
         except PermissionError:
-            print("Permission denied to open the JSON file.")
+            return ("Permission denied to open the JSON file.")
         except Exception as e:
-            print(f"An unexpected error occured: {e}")
+            return (f"An unexpected error occured: {e}")
 
         def format_numbered_list(items):
             if not items:
@@ -363,11 +350,19 @@ class SentimentScopeAI:
             return "\n".join(lines)
 
         rating_meaning = self.__infer_rating_meaning()
-            
-        parts = [
-            textwrap.fill(rating_meaning, width=70),
-            textwrap.fill("The following reviews highlight some concerns users have expressed:", width=70),
-            format_numbered_list(self.__notable_negatives)
-        ]
+        
+        parts = [textwrap.fill(rating_meaning, width=70)]
 
-        return "\n\n".join(parts)
+        if self.__calculate_all_review() >= 4:
+            parts.append(
+                textwrap.fill(
+                    "Since the overall rating is good, I don't have any notable negatives to mention.",
+                    width=70))
+        else:
+            parts.append(
+                textwrap.fill(
+                    "The following reviews highlight some concerns users have expressed:",
+                    width=70))
+            parts.append(format_numbered_list(self.__notable_negatives))
+
+        return "\n\n".join(parts) 

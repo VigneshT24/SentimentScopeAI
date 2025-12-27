@@ -140,8 +140,8 @@ All required dependencies are automatically installed with the package.
 ```python
 from sentimentscopeai import SentimentScopeAI
 
-# MAKE SURE TO PASS IN: current_folder/json_file_name, not just json_file_name
-review_bot = ssAI.SentimentScopeAI("Testing/companyreview.json")
+# MAKE SURE TO PASS IN: current_folder/json_file_name, not just json_file_name if the following doesn't work
+review_bot = ssAI.SentimentScopeAI("companyreview.json")
 
 print(review_bot.generate_summary())
 ```
