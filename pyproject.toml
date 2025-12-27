@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentimentscopeai"
+version = "1.0.0"
+description = "Transformer-based review sentiment analysis and actionable insight generation."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Vignesh Thondikulam" }
+]
+
+dependencies = [
+  "torch",
+  "transformers"
+]
+
+[project.urls]
+Homepage = "https://github.com/VigneshT24/SentimentScopeAI"
+Repository = "https://github.com/VigneshT24/SentimentScopeAI"

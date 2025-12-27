@@ -1,3 +1,16 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
 .venv/
-__pychache__/
-test_torch.py
+venv/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# OS/editor noise
+.DS_Store
+.vscode/
