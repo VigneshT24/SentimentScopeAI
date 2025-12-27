@@ -4,7 +4,6 @@ import os
 import string
 import random
 import textwrap
-import spacy
 from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM, T5ForConditionalGeneration, T5Tokenizer, set_seed)
 
 class SentimentScopeAI:
@@ -15,7 +14,6 @@ class SentimentScopeAI:
     __pytorch_model_name = None
     __pytorch_tokenizer = None
     __pytorch_model = None
-    __spacy_nlp = None
     __json_file_path = None
     __service_name = None
     __device = None
@@ -61,13 +59,6 @@ class SentimentScopeAI:
             ).to(self.__device)
         return self.__pytorch_model
 
-    @property
-    def spacy_model(self):
-        """Lazy loader for the Spacy NLP."""
-        if self.__spacy_nlp is None:
-            self.__spacy_nlp = spacy.load("en_core_web_sm")
-        return self.__spacy_nlp
-    
     @property
     def extraction_model(self):
         """Lazy loader for the Flan-T5 extraction model."""
