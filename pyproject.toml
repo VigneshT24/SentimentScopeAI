@@ -15,7 +15,8 @@ authors = [
 
 dependencies = [
   "torch",
-  "transformers"
+  "transformers",
+  "sentencepiece"
 ]
 
 [project.urls]
