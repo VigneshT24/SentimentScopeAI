@@ -4,6 +4,10 @@ import os
 import string
 import random
 import textwrap
+import time
+import sys
+import threading
+from difflib import SequenceMatcher
 from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM, T5ForConditionalGeneration, T5Tokenizer, set_seed)
 
 class SentimentScopeAI:
@@ -20,6 +24,8 @@ class SentimentScopeAI:
     __notable_negatives = []
     __extraction_model = None
     __extraction_tokenizer = None
+    stop_timer = None
+    timer_thread = None
 
     def __init__(self, file_path):
         """Initialize the SentimentScopeAI class with the specified JSON file path."""
@@ -28,6 +34,22 @@ class SentimentScopeAI:
         self.__extraction_model_name = "google/flan-t5-large"
         self.__json_file_path = os.path.abspath(file_path)
         self.__device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.stop_timer = threading.Event()
+        self.timer_thread = threading.Thread(target=self.__time_threading)
+        self.timer_thread.start()
+
+    def __time_threading(self):
+        start_time = time.time()
+        while not self.stop_timer.is_set():
+            elapsed_time = time.time() - start_time
+            mins, secs = divmod(elapsed_time, 60)
+            hours, mins = divmod(mins, 60)
+            
+            timer_display = f"SentimentScopeAI is processing (elapsed time): {int(hours):02}:{int(mins):02}:{int(secs):02}"
+            sys.stdout.write('\r' + timer_display)
+            sys.stdout.flush()
+            
+            time.sleep(0.1)
 
     @property
     def hf_model(self):
@@ -38,7 +60,7 @@ class SentimentScopeAI:
 
     @property
     def hf_tokenizer(self):
-        """Lazy loader for the T5 Tokenizer."""
+        """Lazy loader for the Paraphrase Tokenizer."""
         if self.__hf_tokenizer is None:
             self.__hf_tokenizer = T5Tokenizer.from_pretrained(self.__hf_model_name, legacy=True)
         return self.__hf_tokenizer
@@ -76,6 +98,7 @@ class SentimentScopeAI:
                 self.__extraction_model_name
             )
         return self.__extraction_tokenizer
+
 
     def __get_predictive_star(self, text) -> int:
         """
@@ -200,6 +223,23 @@ class SentimentScopeAI:
         else:
             return generate_sentence("Overall sentiment is very positive, reflecting strong user approval and satisfaction.")
 
+    def __delete_duplicate(self, issues: list[str]) -> list[str]:
+        if not issues:
+            return []
+        
+
+        result = []
+        for issue in issues:
+            if not issue or len(issue.split()) <= 2:
+                continue
+            issue = issue.lower().strip()
+            
+            is_dup = any(SequenceMatcher(None, issue, existing).ratio() > 0.75 for existing in result)
+
+            if not is_dup:
+                result.append(issue)
+        return result
+    
     def __extract_negative_aspects(self, review: str) -> list[str]:
         """
         Extract actionable negative aspects from a review using AI-based text generation.
@@ -229,14 +269,27 @@ class SentimentScopeAI:
         """
         if not review or review.isspace():
             return []
-        
-        prompt = f"""What problems does this review mention? List each as a brief phrase.
-        Each problem should be describing what is wrong, DON'T OUTPUT one word lines like "horrible" or "bad".
-        Make sure they are CONSTRUCTIVE CRITICISM THAT CAN HELP SOMEONE IMPROVE
 
-        Review: {review}
+        prompt = f"""
+        Extract ONE actionable operational/service issues from the review.
 
-        Problems mentioned:"""
+        Output EXACTLY one line:
+        - if the review has no issue, the issue is vague, or seems positive, output exactly this: none
+        - or: a 6 to 14 word issue describing what went wrong (include concrete details like time/fee if present).
+
+        Do NOT output:
+        - vague sentiment ("rude", "treated like garbage", "horrible")
+        - filler ("where to start", "unbelievable")
+        - person names (keep role only)
+        - location-only statements
+
+        Use only words from the review. Do not invent details
+
+        Review:
+        {review}
+
+        Answer:
+        """.strip()
 
         inputs = self.extraction_tokenizer(
             prompt, 
@@ -247,12 +300,11 @@ class SentimentScopeAI:
 
         outputs = self.extraction_model.generate(
             **inputs,
-            max_length=150,
-            num_beams=4,
-            temperature=0.7,
-            do_sample=True,
-            top_p=0.9,
-            early_stopping=True
+            max_new_tokens=30,
+            num_beams=5,
+            do_sample=False,
+            no_repeat_ngram_size=3,
+            early_stopping=True,
         )
 
         result = self.extraction_tokenizer.decode(outputs[0], skip_special_tokens=True)
@@ -265,7 +317,7 @@ class SentimentScopeAI:
             line = line.lstrip('•-*1234567890.) ')
             if line and len(line) > 3:
                 issues.append(line)
-        
+
         return issues
     
     def output_all_reviews(self) -> None:
@@ -319,9 +371,8 @@ class SentimentScopeAI:
             with open(self.__json_file_path, 'r') as file:
                 company_reviews = json.load(file)
                 for i, entry in enumerate(company_reviews, 1):
-                    if self.__get_predictive_star(entry['review']) <= 2:
-                        for part in self.__extract_negative_aspects(entry['review']):
-                            self.__notable_negatives.append(part)
+                    for part in self.__extract_negative_aspects(entry['review']):
+                        self.__notable_negatives.append(part)
                     self.__service_name = entry['service_name']
                     reviews.append(entry['review'])
         except FileNotFoundError:
@@ -332,6 +383,8 @@ class SentimentScopeAI:
             return ("Permission denied to open the JSON file.")
         except Exception as e:
             return (f"An unexpected error occured: {e}")
+        
+        self.__notable_negatives = self.__delete_duplicate(self.__notable_negatives)
 
         def format_numbered_list(items):
             if not items:
@@ -347,6 +400,11 @@ class SentimentScopeAI:
                 )
                 lines.append(wrapper.fill(str(item)))
             return "\n".join(lines)
+        
+        self.stop_timer.set()
+        self.timer_thread.join()
+        print()
+        print()
 
         rating_meaning = self.__infer_rating_meaning()
         
