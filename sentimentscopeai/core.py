@@ -33,6 +33,13 @@ class SentimentScopeAI:
         self.__pytorch_model_name = "nlptown/bert-base-multilingual-uncased-sentiment"
         self.__extraction_model_name = "google/flan-t5-large"
         self.__json_file_path = os.path.abspath(file_path)
+        print("""
+        ─────────────────────────────────────────────────────────────────────────────
+        SentimentScopeAI can make mistakes. This AI may produce incomplete summaries,
+        misclassify sentiment, or categorize positive feedback as negative. Please 
+        verify critical insights before making decisions based on this analysis.
+        ─────────────────────────────────────────────────────────────────────────────
+        """)
         self.__device = "cuda" if torch.cuda.is_available() else "cpu"
         self.__stop_timer = threading.Event()
         self.__timer_thread = threading.Thread(target=self.__time_threading)
