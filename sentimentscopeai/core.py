@@ -24,8 +24,8 @@ class SentimentScopeAI:
     __notable_negatives = []
     __extraction_model = None
     __extraction_tokenizer = None
-    stop_timer = None
-    timer_thread = None
+    __stop_timer = None
+    __timer_thread = None
 
     def __init__(self, file_path):
         """Initialize the SentimentScopeAI class with the specified JSON file path."""
@@ -34,13 +34,14 @@ class SentimentScopeAI:
         self.__extraction_model_name = "google/flan-t5-large"
         self.__json_file_path = os.path.abspath(file_path)
         self.__device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.stop_timer = threading.Event()
-        self.timer_thread = threading.Thread(target=self.__time_threading)
-        self.timer_thread.start()
+        self.__stop_timer = threading.Event()
+        self.__timer_thread = threading.Thread(target=self.__time_threading)
+        self.__timer_thread.start()
 
     def __time_threading(self):
+        """Time Threading for elapsed timer while SentimentScopeAI processes"""
         start_time = time.time()
-        while not self.stop_timer.is_set():
+        while not self.__stop_timer.is_set():
             elapsed_time = time.time() - start_time
             mins, secs = divmod(elapsed_time, 60)
             hours, mins = divmod(mins, 60)
@@ -142,18 +143,19 @@ class SentimentScopeAI:
         return (sum / num_reviews) if num_reviews != 0 else 0
     
     def __paraphrase_statement(self, statement: str) -> list[str]:
-        """Generates multiple unique paraphrased variations of a given string.
+        """
+            Generates multiple unique paraphrased variations of a given string.
 
-        Uses a Hugging Face transformer model to generate five variations of the 
-        input statement. Results are normalized (lowercased, stripped of 
-        punctuation, and whitespace-cleaned) to ensure uniqueness.
+            Uses a Hugging Face transformer model to generate five variations of the 
+            input statement. Results are normalized (lowercased, stripped of 
+            punctuation, and whitespace-cleaned) to ensure uniqueness.
 
-        Args:
-            statement (str): The text to be paraphrased.
+            Args:
+                statement (str): The text to be paraphrased.
 
-        Returns:
-            list[str]: A list of unique, cleaned paraphrased strings. 
-                Returns [""] if the input is None, empty, or whitespace.
+            Returns:
+                list[str]: A list of unique, cleaned paraphrased strings. 
+                    Returns [""] if the input is None, empty, or whitespace.
         """
         set_seed(random.randint(0, 2**32 - 1))
         
@@ -193,16 +195,20 @@ class SentimentScopeAI:
         return unique
     
     def __infer_rating_meaning(self) -> str:
-        """Translates numerical rating scores into descriptive, paraphrased sentiment.
+        """
+            Translates numerical rating scores into descriptive, paraphrased sentiment.
 
-        Calculates the aggregate review score and maps it to a sentiment category 
-        (ranging from 'Very Negative' to 'Very Positive'). To avoid repetitive 
-        output, the final description is passed through an AI paraphrasing 
-        engine and a random variation is selected.
+            Calculates the aggregate review score and maps it to a sentiment category 
+            (ranging from 'Very Negative' to 'Very Positive'). To avoid repetitive 
+            output, the final description is passed through an AI paraphrasing 
+            engine and a random variation is selected.
 
-        Returns:
-            str: A randomly selected paraphrased sentence describing the 
-                overall service sentiment.
+            Args:
+                None
+
+            Returns:
+                str: A randomly selected paraphrased sentence describing the 
+                    overall service sentiment.
         """
         overall_rating = self.__calculate_all_review()
 
@@ -224,6 +230,21 @@ class SentimentScopeAI:
             return generate_sentence("Overall sentiment is very positive, reflecting strong user approval and satisfaction.")
 
     def __delete_duplicate(self, issues: list[str]) -> list[str]:
+        """
+            Filters out duplicate and near-duplicate issue strings using fuzzy matching.
+
+            The method normalizes strings by converting them to lowercase and stripping 
+            whitespace. It ignores issues that are empty or contain two or fewer words. 
+            A string is considered a duplicate if its similarity ratio (via SequenceMatcher) 
+            is greater than 0.75 compared to any already accepted issue.
+
+            Args:
+                issues (list[str]): A list of raw issue descriptions to be processed.
+
+            Returns:
+                list[str]: A list of unique, normalized issue strings that met the 
+                    length and similarity requirements.
+        """
         if not issues:
             return []
         
@@ -242,30 +263,30 @@ class SentimentScopeAI:
     
     def __extract_negative_aspects(self, review: str) -> list[str]:
         """
-        Extract actionable negative aspects from a review using AI-based text generation.
-        
-        This method uses the Flan-T5 language model to identify specific, constructive
-        problems mentioned in a review. Unlike simple sentiment analysis, this extracts
-        concrete issues that describe what is broken, missing, or difficult - filtering
-        out vague emotional words like "horrible" or "bad".
-        
-        The extraction focuses on actionable feedback that can help improve a product
-        or service, such as "notifications arrive at wrong times" rather than just
-        "notifications are bad".
-        
-        Args:
-            review (str): The review text to analyze for negative aspects.
-        
-        Returns:
-            list[str]: A list of specific problem phrases extracted from the review.
-                    Each phrase describes a concrete issue. Returns an empty list
-                    if the review is empty, contains only whitespace, or no 
-                    problems are identified.
-        
-        Note:
-            This method uses the Flan-T5 model which is loaded lazily on first use.
-            Processing time depends on review length and available hardware (CPU/GPU).
-            Very short outputs (≤3 characters) are filtered out as likely artifacts.
+            Extract actionable negative aspects from a review using AI-based text generation.
+            
+            This method uses the Flan-T5 language model to identify specific, constructive
+            problems mentioned in a review. Unlike simple sentiment analysis, this extracts
+            concrete issues that describe what is broken, missing, or difficult - filtering
+            out vague emotional words like "horrible" or "bad".
+            
+            The extraction focuses on actionable feedback that can help improve a product
+            or service, such as "notifications arrive at wrong times" rather than just
+            "notifications are bad".
+            
+            Args:
+                review (str): The review text to analyze for negative aspects.
+            
+            Returns:
+                list[str]: A list of specific problem phrases extracted from the review.
+                        Each phrase describes a concrete issue. Returns an empty list
+                        if the review is empty, contains only whitespace, or no 
+                        problems are identified.
+            
+            Note:
+                This method uses the Flan-T5 model which is loaded lazily on first use.
+                Processing time depends on review length and available hardware (CPU/GPU).
+                Very short outputs (≤3 characters) are filtered out as likely artifacts.
         """
         if not review or review.isspace():
             return []
@@ -341,30 +362,33 @@ class SentimentScopeAI:
 
     def generate_summary(self) -> str:
         """
-        Generate a formatted sentiment summary based on user reviews for a service.
+            Generate a formatted sentiment summary based on user reviews for a service.
 
-        This method reads a JSON file containing user reviews, infers the overall
-        sentiment rating, and produces a structured, human-readable summary.
-        The summary includes:
-            - A concise explanation of the inferred sentiment rating
-            - A numbered list of representative negatives mentioned
+            This method reads a JSON file containing user reviews, infers the overall
+            sentiment rating, and produces a structured, human-readable summary.
+            The summary includes:
+                - A concise explanation of the inferred sentiment rating
+                - A numbered list of representative negatives mentioned
 
-        Long-form reviews are wrapped to a fixed line width while preserving
-        list structure and readability.
+            Long-form reviews are wrapped to a fixed line width while preserving
+            list structure and readability.
 
-        The method is resilient to common file and parsing errors and will
-        emit descriptive messages if the input file cannot be accessed or
-        decoded properly.
+            The method is resilient to common file and parsing errors and will
+            emit descriptive messages if the input file cannot be accessed or
+            decoded properly.
 
-        Returns:
-            str
-                A multi-paragraph, text-wrapped sentiment summary suitable for
-                console output, logs, or reports.
+            Args:
+                None
 
-        Raises:
-            None
-                All exceptions are handled internally with descriptive error
-                messages to prevent interruption of execution.
+            Returns:
+                str
+                    A multi-paragraph, text-wrapped sentiment summary suitable for
+                    console output, logs, or reports.
+
+            Raises:
+                None
+                    All exceptions are handled internally with descriptive error
+                    messages to prevent interruption of execution.
         """
         try:
             reviews = []
@@ -401,8 +425,8 @@ class SentimentScopeAI:
                 lines.append(wrapper.fill(str(item)))
             return "\n".join(lines)
         
-        self.stop_timer.set()
-        self.timer_thread.join()
+        self.__stop_timer.set()
+        self.__timer_thread.join()
         print()
         print()
 
