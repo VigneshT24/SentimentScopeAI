@@ -340,25 +340,6 @@ class SentimentScopeAI:
                 issues.append(line)
 
         return issues
-    
-    def output_all_reviews(self) -> None:
-        """
-            Output all reviews from the JSON file in a formatted manner.
-
-            Args:
-                None
-            Returns:
-                None
-        """
-        # don't need try-catch because it is handled in generate_summary()
-        with open(self.__json_file_path, 'r') as file:
-            company_reviews = json.load(file)
-            for i, entry in enumerate(company_reviews, 1):
-                print(f"Review #{i}")
-                print(f"Company Name: {entry['company_name']}")
-                print(f"Service Name: {entry['service_name']}")
-                print(f"Review: {textwrap.fill(entry['review'], width=70)}")
-                print("\n\n")
 
     def generate_summary(self) -> str:
         """
