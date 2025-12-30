@@ -129,7 +129,15 @@ class SentimentScopeAI:
             Returns:
                 int: The predicted star rating (1 to 5).
         """
-        inputs = self.pytorch_tokenizer(text, return_tensors="pt").to(self.__device)
+
+        max_len = getattr(self.pytorch_tokenizer, "model_max_length", 512)
+
+        inputs = self.pytorch_tokenizer(
+            text,
+            return_tensors="pt",
+            truncation=True,
+            max_length=max_len
+        ).to(self.__device)
 
         with torch.no_grad():
             outputs = self.pytorch_model(**inputs)
