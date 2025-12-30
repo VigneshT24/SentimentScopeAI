@@ -1,3 +1,6 @@
+![Sentiment Scope AI Logo](https://github.com/user-attachments/assets/493203ec-ed08-4ad7-8e1a-1c4aced128cb)
+
+
 # SentimentScopeAI
 ## Fine-Grained Review Sentiment Analysis & Insight Generation
 
