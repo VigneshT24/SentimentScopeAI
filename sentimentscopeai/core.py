@@ -19,19 +19,32 @@ class SentimentScopeAI:
     __pytorch_tokenizer = None
     __pytorch_model = None
     __json_file_path = None
-    __service_name = None
     __device = None
     __notable_negatives = []
     __extraction_model = None
     __extraction_tokenizer = None
+    __company_name = None
+    __service_name = None
     __stop_timer = None
     __timer_thread = None
 
-    def __init__(self, file_path):
-        """Initialize the SentimentScopeAI class with the specified JSON file path."""
+    def __init__(self, file_path, company_name, service_name):
+        """
+            Initialize the SentimentScopeAI class with the specified JSON file path, company's name, and service's name.
+
+            Args:
+                - file_path (str): specified JSON file path
+                - company_name (str): name of the company being reviewed
+                - service_name (str): name of the company's service/product being reviewed
+
+            Returns:
+                tuple: A tuple containing the total number of reviews and the average star rating.
+        """
         self.__hf_model_name = "Vamsi/T5_Paraphrase_Paws"
         self.__pytorch_model_name = "nlptown/bert-base-multilingual-uncased-sentiment"
         self.__extraction_model_name = "google/flan-t5-large"
+        self.__company_name = company_name
+        self.__service_name = service_name
         self.__json_file_path = os.path.abspath(file_path)
         print("""
         ─────────────────────────────────────────────────────────────────────────────
@@ -44,20 +57,6 @@ class SentimentScopeAI:
         self.__stop_timer = threading.Event()
         self.__timer_thread = threading.Thread(target=self.__time_threading)
         self.__timer_thread.start()
-
-    def __time_threading(self):
-        """Time Threading for elapsed timer while SentimentScopeAI processes"""
-        start_time = time.time()
-        while not self.__stop_timer.is_set():
-            elapsed_time = time.time() - start_time
-            mins, secs = divmod(elapsed_time, 60)
-            hours, mins = divmod(mins, 60)
-            
-            timer_display = f"SentimentScopeAI is processing (elapsed time): {int(hours):02}:{int(mins):02}:{int(secs):02}"
-            sys.stdout.write('\r' + timer_display)
-            sys.stdout.flush()
-            
-            time.sleep(0.1)
 
     @property
     def hf_model(self):
@@ -106,9 +105,22 @@ class SentimentScopeAI:
                 self.__extraction_model_name
             )
         return self.__extraction_tokenizer
+    
+    def __time_threading(self) -> None:
+        """Time Threading for elapsed timer while SentimentScopeAI processes"""
+        start_time = time.time()
+        while not self.__stop_timer.is_set():
+            elapsed_time = time.time() - start_time
+            mins, secs = divmod(elapsed_time, 60)
+            hours, mins = divmod(mins, 60)
+            
+            timer_display = f"SentimentScopeAI is processing (elapsed time): {int(hours):02}:{int(mins):02}:{int(secs):02}"
+            sys.stdout.write('\r' + timer_display)
+            sys.stdout.flush()
+            
+            time.sleep(0.1)
 
-
-    def __get_predictive_star(self, text) -> int:
+    def __get_predictive_star(self, text: str) -> int:
         """
             Predict the sentiment star rating for the given text review.
 
@@ -143,9 +155,8 @@ class SentimentScopeAI:
             sum = 0
             num_reviews = 0
             for i, entry in enumerate(all_reviews, 1):
-                single_review_rating = self.__get_predictive_star(entry['review'])
+                single_review_rating = self.__get_predictive_star(entry)
                 sum += single_review_rating
-                self.__service_name = entry['service_name']
                 num_reviews = i
         return (sum / num_reviews) if num_reviews != 0 else 0
     
@@ -223,7 +234,7 @@ class SentimentScopeAI:
             return "JSON FILE PATH IS UNIDENTIFIABLE, please try inputting the name properly (e.g. \"companyreview.json\")."
 
         def generate_sentence(rating_summ):
-            return f"For {self.__service_name}: " + random.choice(self.__paraphrase_statement(rating_summ)).strip()
+            return f"For {self.__company_name}'s {self.__service_name}: " + random.choice(self.__paraphrase_statement(rating_summ)).strip()
 
         if 1.0 <= overall_rating < 2.0:
             return generate_sentence("Overall sentiment is very negative, indicating widespread dissatisfaction among users.")
@@ -383,10 +394,9 @@ class SentimentScopeAI:
             with open(self.__json_file_path, 'r') as file:
                 company_reviews = json.load(file)
                 for i, entry in enumerate(company_reviews, 1):
-                    for part in self.__extract_negative_aspects(entry['review']):
+                    for part in self.__extract_negative_aspects(entry):
                         self.__notable_negatives.append(part)
-                    self.__service_name = entry['service_name']
-                    reviews.append(entry['review'])
+                    reviews.append(entry)
         except FileNotFoundError:
             return ("JSON FILE PATH IS UNIDENTIFIABLE, please try inputting the name properly (e.g. \"companyreview.json\").")
         except json.JSONDecodeError:
