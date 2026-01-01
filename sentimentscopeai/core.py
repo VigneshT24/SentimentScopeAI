@@ -49,7 +49,7 @@ class SentimentScopeAI:
         print("""
         ─────────────────────────────────────────────────────────────────────────────
         SentimentScopeAI can make mistakes. This AI may produce incomplete summaries,
-        misclassify sentiment, or categorize positive feedback as negative. Please 
+        misclassify sentiment, or categorize positive feedback as negative. Please
         verify critical insights before making decisions based on this analysis.
         ─────────────────────────────────────────────────────────────────────────────
         """)
@@ -105,7 +105,7 @@ class SentimentScopeAI:
                 self.__extraction_model_name
             )
         return self.__extraction_tokenizer
-    
+   
     def __time_threading(self) -> None:
         """Time Threading for elapsed timer while SentimentScopeAI processes"""
         start_time = time.time()
@@ -113,11 +113,11 @@ class SentimentScopeAI:
             elapsed_time = time.time() - start_time
             mins, secs = divmod(elapsed_time, 60)
             hours, mins = divmod(mins, 60)
-            
+           
             timer_display = f"SentimentScopeAI is processing (elapsed time): {int(hours):02}:{int(mins):02}:{int(secs):02}"
             sys.stdout.write('\r' + timer_display)
             sys.stdout.flush()
-            
+           
             time.sleep(0.1)
 
     def __get_predictive_star(self, text: str) -> int:
@@ -129,7 +129,6 @@ class SentimentScopeAI:
             Returns:
                 int: The predicted star rating (1 to 5).
         """
-
         max_len = getattr(self.pytorch_tokenizer, "model_max_length", 512)
 
         inputs = self.pytorch_tokenizer(
@@ -167,24 +166,24 @@ class SentimentScopeAI:
                 sum += single_review_rating
                 num_reviews = i
         return (sum / num_reviews) if num_reviews != 0 else 0
-    
+   
     def __paraphrase_statement(self, statement: str) -> list[str]:
         """
             Generates multiple unique paraphrased variations of a given string.
 
-            Uses a Hugging Face transformer model to generate five variations of the 
-            input statement. Results are normalized (lowercased, stripped of 
+            Uses a Hugging Face transformer model to generate five variations of the
+            input statement. Results are normalized (lowercased, stripped of
             punctuation, and whitespace-cleaned) to ensure uniqueness.
 
             Args:
                 statement (str): The text to be paraphrased.
 
             Returns:
-                list[str]: A list of unique, cleaned paraphrased strings. 
+                list[str]: A list of unique, cleaned paraphrased strings.
                     Returns [""] if the input is None, empty, or whitespace.
         """
         set_seed(random.randint(0, 2**32 - 1))
-        
+       
         if statement is None or statement.isspace() or statement == "":
             return [""]
 
@@ -203,7 +202,7 @@ class SentimentScopeAI:
         )
 
         resultant = self.hf_tokenizer.batch_decode(output, skip_special_tokens=True)
-        
+       
         seen = set()
         unique = []
         translator = str.maketrans('', '', string.punctuation)
@@ -219,21 +218,21 @@ class SentimentScopeAI:
             unique.append(set_sentence)
 
         return unique
-    
+   
     def __infer_rating_meaning(self) -> str:
         """
             Translates numerical rating scores into descriptive, paraphrased sentiment.
 
-            Calculates the aggregate review score and maps it to a sentiment category 
-            (ranging from 'Very Negative' to 'Very Positive'). To avoid repetitive 
-            output, the final description is passed through an AI paraphrasing 
+            Calculates the aggregate review score and maps it to a sentiment category
+            (ranging from 'Very Negative' to 'Very Positive'). To avoid repetitive
+            output, the final description is passed through an AI paraphrasing
             engine and a random variation is selected.
 
             Args:
                 None
 
             Returns:
-                str: A randomly selected paraphrased sentence describing the 
+                str: A randomly selected paraphrased sentence describing the
                     overall service sentiment.
         """
         overall_rating = self.__calculate_all_review()
@@ -259,91 +258,189 @@ class SentimentScopeAI:
         """
             Filters out duplicate and near-duplicate issue strings using fuzzy matching.
 
-            The method normalizes strings by converting them to lowercase and stripping 
-            whitespace. It ignores issues that are empty or contain two or fewer words. 
-            A string is considered a duplicate if its similarity ratio (via SequenceMatcher) 
+            The method normalizes strings by converting them to lowercase and stripping
+            whitespace. It ignores issues that are empty or contain two or fewer words.
+            A string is considered a duplicate if its similarity ratio (via SequenceMatcher)
             is greater than 0.75 compared to any already accepted issue.
 
             Args:
                 issues (list[str]): A list of raw issue descriptions to be processed.
 
             Returns:
-                list[str]: A list of unique, normalized issue strings that met the 
-                    length and similarity requirements.
+                list[str]: A list of unique, normalized issue strings that met the similarity requirements.
         """
         if not issues:
             return []
-        
 
         result = []
         for issue in issues:
-            if not issue or len(issue.split()) <= 2:
+            if not issue:
                 continue
             issue = issue.lower().strip()
-            
-            is_dup = any(SequenceMatcher(None, issue, existing).ratio() > 0.75 for existing in result)
+           
+            is_dup = any(SequenceMatcher(None, issue, existing).ratio() >= 0.40 for existing in result)
 
             if not is_dup:
                 result.append(issue)
         return result
-    
+   
+    def __validate_issue(self, extracted_issue: str) -> bool:
+        """
+            Determine whether an extracted line represents a true negative issue.
+
+            This method acts as a polarity gate after issue extraction, filtering out
+            positives, neutral statements, feature descriptions, and vague suggestions
+            that were incorrectly labeled as issues.
+
+            Args:
+                extracted_issue (str): A single line extracted as a potential issue.
+
+            Returns:
+                bool: True if the line is a clear negative issue, False otherwise.
+        """
+
+        if not extracted_issue:
+            return False
+       
+        vprompt = f"""
+        You are a strict polarity verifier for extracted "issues" across many industries.
+
+        Task:
+        Given ONE extracted line, decide if it is truly a NEGATIVE complaint/problem.
+
+        Return EXACTLY one token: YES or NO
+
+        Rules:
+        - Output YES only if the line explicitly states a problem, failure, drawback, frustration, harm, or limitation.
+        - Output NO for praise, neutral facts, feature descriptions, or wishes/suggestions without a stated problem.
+        - Mixed lines: output NO only if the negative part is explicit.
+        - No inference. If ambiguous, output NO.
+
+        Few-shot examples:
+
+        1) INPUT: "The dashboard times out and loses my changes."
+        OUTPUT: YES
+
+        2) INPUT: "Package arrived late and tracking never updated."
+        OUTPUT: YES
+
+        3) INPUT: "I got charged an unexpected fee and support couldn't explain it."
+        OUTPUT: YES
+
+        4) INPUT: "Flight was canceled with little notice and rebooking took hours."
+        OUTPUT: YES
+
+        5) INPUT: "Internet drops daily and speeds are far below what I pay for."
+        OUTPUT: YES
+
+        6) INPUT: "Appointment started 45 minutes late and I couldn't reach anyone."
+        OUTPUT: YES
+
+        7) INPUT: "Delivery was fast and the order was correct."
+        OUTPUT: NO
+
+        8) INPUT: "Graphics are amazing and performance is smooth."
+        OUTPUT: NO
+
+        9) INPUT: "Setup was easy and it integrates well with Alexa."
+        OUTPUT: NO
+
+        10) INPUT: "Content is well-structured and easy to follow."
+            OUTPUT: NO
+
+        11) INPUT: "Timesheets are easy to submit and approvals are quick."
+            OUTPUT: NO
+
+        12) INPUT: "Documentation is clear and examples are helpful."
+            OUTPUT: NO
+
+        Now classify:
+
+        INPUT: "{extracted_issue}"
+
+        OUTPUT:
+        """.strip()
+
+        validator_in = self.extraction_tokenizer(vprompt, return_tensors="pt", max_length=512, truncation=True).to(self.__device)
+        validator_out = self.extraction_model.generate(**validator_in, max_new_tokens=5, num_beams=1, do_sample=False)
+        verdict = self.extraction_tokenizer.decode(validator_out[0], skip_special_tokens=True).strip().upper()
+        return verdict == "YES"
+   
     def __extract_negative_aspects(self, review: str) -> list[str]:
         """
             Extract actionable negative aspects from a review using AI-based text generation.
-            
+           
             This method uses the Flan-T5 language model to identify specific, constructive
             problems mentioned in a review. Unlike simple sentiment analysis, this extracts
             concrete issues that describe what is broken, missing, or difficult - filtering
             out vague emotional words like "horrible" or "bad".
-            
-            The extraction focuses on actionable feedback that can help improve a product
-            or service, such as "notifications arrive at wrong times" rather than just
-            "notifications are bad".
-            
+           
             Args:
                 review (str): The review text to analyze for negative aspects.
-            
+           
             Returns:
                 list[str]: A list of specific problem phrases extracted from the review.
-                        Each phrase describes a concrete issue. Returns an empty list
-                        if the review is empty, contains only whitespace, or no 
-                        problems are identified.
-            
+           
             Note:
                 This method uses the Flan-T5 model which is loaded lazily on first use.
                 Processing time depends on review length and available hardware (CPU/GPU).
-                Very short outputs (≤3 characters) are filtered out as likely artifacts.
+                Very short outputs (<=3 characters) are filtered out as likely artifacts.
         """
         if not review or review.isspace():
             return []
 
         prompt = f"""
-        Extract ONE actionable operational/service issues from the review.
+        Task: Extract ONE specific operational issue from the review in 6-14 words.
 
-        Output EXACTLY one line:
-        - if the review has no issue, the issue is vague, or seems positive, output exactly this: none
-        - or: a 6 to 14 word issue describing what went wrong (include concrete details like time/fee if present).
+        Rules:
+        - if there is no clear issue, only vague emotions, or positive review, then Output: none
+        - Output the concrete problem using ONLY words from the review, but be concise
+        - Include specific details (numbers, times, items) when mentioned
+        - Keep role descriptions, if there are any, BUT remove person names
 
-        Do NOT output:
-        - vague sentiment ("rude", "treated like garbage", "horrible")
-        - filler ("where to start", "unbelievable")
-        - person names (keep role only)
-        - location-only statements
+        Examples:
 
-        Use only words from the review. Do not invent details
+        Review: "Waited 2 hours past scheduled time with no explanation given."
+        Answer: waited 2 hours past scheduled time no explanation
 
-        Review:
-        {review}
+        Review: "Terrible experience, worst place ever, never again!"
+        Answer: none
 
+        Review: "Was charged $50 extra fee that wasn't mentioned upfront."
+        Answer: charged 50 dollar extra fee not mentioned upfront
+
+        Review: "Staff was extremely rude and unprofessional throughout."
+        Answer: none
+
+        Review: "Ordered item A but received item B, return process unclear."
+        Answer: ordered item a received item b return unclear
+
+        Review: "System crashed three times during checkout process."
+        Answer: system crashed three times during checkout
+
+        Review: "Amazing service, highly recommend to everyone!"
+        Answer: none
+
+        Review: "Called customer support 5 times, never got callback as promised."
+        Answer: called support 5 times never got promised callback
+
+        Review: "Product arrived damaged with missing parts, no replacement offered."
+        Answer: product arrived damaged missing parts no replacement offered
+
+        Review: "Unbelievable how bad this was, absolutely horrible."
+        Answer: none
+
+        Review: "{review}"
         Answer:
         """.strip()
 
         inputs = self.extraction_tokenizer(
-            prompt, 
+            prompt,
             return_tensors="pt",
             max_length=512,
             truncation=True
         ).to(self.__device)
+
 
         outputs = self.extraction_model.generate(
             **inputs,
@@ -356,15 +453,22 @@ class SentimentScopeAI:
 
         result = self.extraction_tokenizer.decode(outputs[0], skip_special_tokens=True)
         if result.strip().lower() in ['none', 'none.', 'no problems', '']:
-            return[]
-        
+            return []
+       
         issues = []
         for line in result.split('\n'):
             line = line.strip()
             line = line.lstrip('•-*1234567890.) ')
             if line and len(line) > 3:
                 issues.append(line)
+       
+        if not issues:
+            return []
 
+
+        if not (self.__validate_issue(issues[0])):
+            return []
+       
         return issues
 
     def generate_summary(self) -> str:
@@ -406,14 +510,14 @@ class SentimentScopeAI:
                         self.__notable_negatives.append(part)
                     reviews.append(entry)
         except FileNotFoundError:
-            return ("JSON FILE PATH IS UNIDENTIFIABLE, please try inputting the name properly (e.g. \"companyreview.json\").")
+            return ("JSON file path is unidentifiable, please try inputting the name properly (e.g. \"companyreview.json\").")
         except json.JSONDecodeError:
-            return ("Could not decode JSON file. Check for valid JSON syntax.")
+            return ("Could not decode JSON file. Check for valid JSON syntax (look at GitHub/PyPi Readme Instructions).")
         except PermissionError:
             return ("Permission denied to open the JSON file.")
         except Exception as e:
             return (f"An unexpected error occured: {e}")
-        
+       
         self.__notable_negatives = self.__delete_duplicate(self.__notable_negatives)
 
         def format_numbered_list(items):
@@ -430,14 +534,14 @@ class SentimentScopeAI:
                 )
                 lines.append(wrapper.fill(str(item)))
             return "\n".join(lines)
-        
+       
         self.__stop_timer.set()
         self.__timer_thread.join()
         print()
         print()
 
         rating_meaning = self.__infer_rating_meaning()
-        
+       
         parts = [textwrap.fill(rating_meaning, width=70)]
 
         if self.__calculate_all_review() >= 4:
@@ -452,4 +556,4 @@ class SentimentScopeAI:
                     width=70))
             parts.append(format_numbered_list(self.__notable_negatives))
 
-        return "\n\n".join(parts) 
+        return "\n\n".join(parts)
