@@ -313,7 +313,7 @@ class SentimentScopeAI:
         Rules:
         - Output YES only if the line explicitly states a problem, failure, drawback, frustration, harm, or limitation.
         - Output NO for praise, neutral facts, feature descriptions, or wishes/suggestions without a stated problem.
-        - Mixed lines: output NO only if the negative part is explicit.
+        - Mixed lines: output NO only if the negative part isn't explicit.
         - No inference. If ambiguous, output NO.
 
         Few-shot examples:
