@@ -79,11 +79,11 @@ Summary Generation
 ```
 
 ## Tech-Stack
-
 * **Language**: Python
 * **Deep Learning**: PyTorch
 * **NLP Models**: HuggingFace Transformers (pre-trained), Flan-T5
-* **Aggregated reasoning**
+* **Web Scraping**: Playwright, Playwright-Stealth, SeleniumBase
+* **Aggregated Reasoning**: Multi-model ensemble approach
 * **Data Handling**: JSON, Python data structures
 
 ## Why SentimentScopeAI?
@@ -130,7 +130,7 @@ What Happens Internally
 * Rating meanings are semantically interpreted
 * Flan-T5 finds the negatives from each review and summarizes the whole file
 
-## IMPORTANT NOTICE:
+## Important Notice:
 
 1.) JSON Input Format (Required)
 
@@ -177,8 +177,37 @@ If you need to analyze multiple products or companies, create separate JSON file
 
 This design improves startup efficiency and memory usage.
 
+## Web Scraping Feature
 
-**SentimentScopeAI is provided as-is and is not liable for any damages arising from its use.
-Do not include personal, sensitive, or confidential information in review data.
-All input data is processed locally and is not used for model training or retained beyond execution.
-Users are responsible for ensuring ethical and appropriate use of the system.**
+SentimentScopeAI now includes an **optional automated review import feature** that can scrape reviews directly from Yelp for analysis.
+
+### Additional Setup for Web Scraping
+
+If you want to use the automated scraping feature, install the required browser:
+```bash
+playwright install chromium
+```
+
+### Example Usage
+```python
+from SentimentScopeAI import sentimentscopeai as ssAI
+
+bot = ssAI.SentimentScopeAI("iphone_reviews.json", "<Company Name>", "<Service Name>")
+
+bot.import_yelp_reviews("https://www.yelp.com/biz/business-name-city#reviews")
+
+print(bot.generate_summary())
+```
+
+### Supported Platforms
+- Yelp Reviews [https://www.yelp.com/]
+
+### Important Notes
+- Scraping may take several minutes for businesses with many reviews
+- The feature includes anti-detection measures and random delays
+- Reviews are automatically cleaned and formatted
+- For best results, ensure a stable internet connection
+
+### Disclaimer: 
+
+SentimentScopeAI is provided **as-is** and is **not liable** for any damages arising from its use. All input data is **processed locally** and is **not used for model training** or retained beyond execution. **Do not include personal, sensitive, or confidential information** in review data. SentimentScopeAI **may produce incomplete summaries or misclassify sentiment**. Always **verify critical insights** before making business decisions. **Web Scraping Notice:** SentimentScopeAI is **not affiliated with, endorsed by, or partnered with Yelp Inc.** Users are **solely responsible for complying with Yelp's Terms of Service** and applicable laws. This feature is provided for **research and personal use only**. Users are **responsible for ensuring ethical and appropriate use** of this system.
