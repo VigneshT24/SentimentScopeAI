@@ -7,6 +7,9 @@ import textwrap
 import time
 import sys
 import threading
+from playwright.sync_api import sync_playwright
+from playwright_stealth import Stealth
+from seleniumbase import sb_cdp
 from difflib import SequenceMatcher
 from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM, T5ForConditionalGeneration, T5Tokenizer, set_seed)
 
@@ -51,12 +54,15 @@ class SentimentScopeAI:
         SentimentScopeAI can make mistakes. This AI may produce incomplete summaries,
         misclassify sentiment, or categorize positive feedback as negative. Please
         verify critical insights before making decisions based on this analysis.
+        
+        Web scraping feature: SentimentScopeAI is not affiliated with, endorsed by,
+        or partnered with Yelp Inc. Users are responsible for complying with Yelp's
+        Terms of Service. This feature is provided for research and personal use only.
         ─────────────────────────────────────────────────────────────────────────────
         """)
         self.__device = "cuda" if torch.cuda.is_available() else "cpu"
         self.__stop_timer = threading.Event()
         self.__timer_thread = threading.Thread(target=self.__time_threading)
-        self.__timer_thread.start()
 
     @property
     def hf_model(self):
@@ -470,6 +476,91 @@ class SentimentScopeAI:
             return []
        
         return issues
+    
+    def import_yelp_reviews(self, url):
+        """
+        Automatically imports customer reviews from a Yelp business page using web scraping.
+        
+        This method navigates through all available review pages on Yelp, extracts review text content (under 500 characters ONLY),
+        cleans and formats the data, and saves it to a JSON file. The scraper handles pagination 
+        automatically and continues until all reviews are retrieved from the business listing.
+        
+        Args:
+            url (str): The complete Yelp business URL including the reviews section.
+        
+        Returns:
+            None 
+        
+        Raises:
+            TimeoutError: If the page fails to load or reviews cannot be found within the timeout period.
+            IOError: If the JSON file cannot be written due to permissions or disk space issues.
+            Exception: If scraping fails due to connectivity issues or changes in Yelp's page structure.
+        
+        Note:
+            - This feature requires an active internet connection
+            - Scraping may take several minutes for businesses with many reviews
+            - Reviews are automatically cleaned (newlines removed, whitespace normalized)
+            - Be mindful of Yelp's terms of service when using this feature
+        """
+        if (os.stat(self.__json_file_path).st_size != 0):
+            print(f"The file: \"{self.__json_file_path}\" must be empty for 'import_yelp_reviews' to work.")
+            sys.exit(1)
+
+        reviews = []
+
+        # set up preprocessing for playwright and seleniumbase
+        sb = sb_cdp.Chrome(locale="en")
+        endpoint_url = sb.get_endpoint_url()
+        json_file = self.__json_file_path
+        web_url = url
+
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp(endpoint_url)
+            context = browser.contexts[0]
+            page = context.pages[0]
+
+            stealth = Stealth()
+            stealth.use_sync(context)
+
+            page.goto(web_url)
+            time.sleep(random.uniform(2, 4))
+
+            # find the reivew_text's unique identifier for the bot to scrape
+            review_selector = "span.raw__09f24__T4Ezm[lang='en']"
+            page.wait_for_selector(review_selector, timeout=10000)
+
+            # scrape all the reviews by scraping -> next page -> scraping...
+            while True:
+                review_texts = page.query_selector_all(review_selector)
+                
+                for text in review_texts:
+                    text = text.inner_text()
+                    cleaned_text = text.replace('\n', ' ').strip()
+                    cleaned_text = ' '.join(cleaned_text.split())
+                    if (len(list(cleaned_text)) < 500):
+                        reviews.append(cleaned_text)
+                
+                next_btn = page.query_selector("a.next-link[aria-label='Next']")
+
+                if not next_btn:
+                    break
+
+                next_btn.hover()
+                time.sleep(random.uniform(1, 2))
+                next_btn.click()
+                time.sleep(random.uniform(4, 7))
+
+            # safetly close the browser once all is done
+            browser.close()
+
+        try:
+            with open(json_file, "w", encoding="utf-8") as rev_file:
+                json.dump(reviews, rev_file, indent=2, ensure_ascii=False)
+            print(f"Saved {len(reviews)} reviews to the file \"{json_file}\"")
+        except IOError as e:
+            print(f"Error saving file: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
 
     def generate_summary(self) -> str:
         """
@@ -501,6 +592,7 @@ class SentimentScopeAI:
                     All exceptions are handled internally with descriptive error
                     messages to prevent interruption of execution.
         """
+        self.__timer_thread.start()
         try:
             reviews = []
             with open(self.__json_file_path, 'r') as file:
