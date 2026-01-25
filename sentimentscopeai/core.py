@@ -163,7 +163,7 @@ class SentimentScopeAI:
                 tuple: A tuple containing the total number of reviews and the average star rating.
         """
         # don't need try-catch because it is handled in generate_summary()
-        with open(self.__json_file_path, 'r') as reviews_file:
+        with open(self.__json_file_path, 'r', encoding="utf-8") as reviews_file:
             all_reviews = json.load(reviews_file)
             sum = 0
             num_reviews = 0
@@ -595,7 +595,7 @@ class SentimentScopeAI:
         self.__timer_thread.start()
         try:
             reviews = []
-            with open(self.__json_file_path, 'r') as file:
+            with open(self.__json_file_path, 'r', encoding="utf-8") as file:
                 company_reviews = json.load(file)
                 for i, entry in enumerate(company_reviews, 1):
                     for part in self.__extract_negative_aspects(entry):
