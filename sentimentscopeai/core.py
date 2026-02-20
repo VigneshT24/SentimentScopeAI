@@ -526,7 +526,7 @@ class SentimentScopeAI:
             time.sleep(random.uniform(2, 4))
 
             # find the reivew_text's unique identifier for the bot to scrape
-            review_selector = "span.raw__09f24__T4Ezm[lang='en']"
+            review_selector = "span[class*='raw__'][lang='en']"
             page.wait_for_selector(review_selector, timeout=10000)
 
             # scrape all the reviews by scraping -> next page -> scraping...
