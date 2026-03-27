@@ -537,8 +537,7 @@ class SentimentScopeAI:
                     text = text.inner_text()
                     cleaned_text = text.replace('\n', ' ').strip()
                     cleaned_text = ' '.join(cleaned_text.split())
-                    if (len(list(cleaned_text)) < 500):
-                        reviews.append(cleaned_text)
+                    reviews.append(cleaned_text)
                 
                 next_btn = page.query_selector("a.next-link[aria-label='Next']")
 
