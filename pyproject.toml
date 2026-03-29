@@ -20,7 +20,8 @@ dependencies = [
   "playwright>=1.40.0",
   "playwright-stealth>=0.1.0",
   "seleniumbase>=4.0.0",
-  "tiktoken"
+  "tiktoken",
+  "protobuf"
 ]
 
 [project.urls]
