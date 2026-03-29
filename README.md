@@ -4,14 +4,12 @@
 # SentimentScopeAI
 ## Fine-Grained Review Sentiment Analysis & Insight Generation
 
-SentimentScopeAI is a Python-based NLP system that leverages PyTorch and HuggingFace Transformers (pre-trained models) to move beyond binary sentiment classification and instead analyze, interpret, and reason over collections of user reviews to help companies improve their products/services
-
-Rather than treating sentiment analysis as a black-box prediction task, this project focuses on semantic interpretation, explainability, and the generation of aggregated insights, simulating how a human analyst would read and summarize large volumes of feedback.
+SentimentScopeAI is a Python-based NLP system that leverages PyTorch and HuggingFace Transformers (pre-trained models) to analyze, interpret, and point out concerns from customer reviews to help companies improve their product/services.
 
 ## Project Motivation
 
 SentimentScopeAI is designed to answer this one main question:
-* What actionable advice can be derived from collective sentiment?
+* What concerns can be derived from a massive set of collective sentiment?
 
 ## Features
 
@@ -19,7 +17,6 @@ SentimentScopeAI is designed to answer this one main question:
 * Uses pre-trained transformer models from HuggingFace
 * Integrated via PyTorch for inference and extensibility
 * Enables robust sentiment understanding without training from scratch
-* Designed so downstream logic operates on model outputs, not raw text
 
 2.) Rating Meaning Inference
 * Implemented the infer_rating_meaning() function
@@ -29,12 +26,6 @@ SentimentScopeAI is designed to answer this one main question:
   * Mixed sentiment
   * Neutral or ambiguous phrasing
   * Disagreement between rating score and review text
-
-Example:
-```
-Rating: 3  
-→ "Mixed experience with noticeable positives and recurring issues."
-```
 
 3.) Explainable, Deterministic Pipeline
 * Downstream reasoning is transparent and testable
@@ -46,7 +37,7 @@ Rating: 3
 * Read all reviews for a given product or service
 * Aggregate sentiment signals across users
 * Detect recurring strengths and weaknesses
-* Generate a summary of all reviews to help stakeholders
+* Generate a summary of all concerns to help stakeholders
 
 These steps transition the system from analysis → reasoning → recommendation generation.
 
@@ -57,9 +48,12 @@ of positive and negative feedback
 
 The following specific issues were extracted from negative reviews:
 
-1) missed a few appointments
-2) not signed into the right account
-3) interface is horrible
+MOST FREQUENT CONCERNS:
+1) missed a few appointments (5 customers)
+2) not signed into the right account (3 customers)
+3) interface is horrible (2 customers)
+
+OTHER CONCERNS:
 4) find the interface confusing
 5) invitations and acceptances are terrible
 ```
@@ -93,7 +87,7 @@ Every organization collects feedback - but reading hundreds or thousands of revi
 SentimentScopeAI is designed to do the heavy lifting:
 * Reads and analyzes large volumes of reviews automatically
 * Identifies recurring pain points across users
-* Pick the one main piece of negative from each review
+* Pick the one main piece of concern from each review (if there are any)
 * Helps teams focus on what to improve rather than sorting through raw text
 
 ## Installation & Usage
@@ -105,9 +99,7 @@ pip install sentimentscopeai
 ```
 
 Requirements:
-* Python 3.9 or newer (Python 3.10 or above is recommended for best performance and compatibility)
-* PyTorch
-* HuggingFace Transformers
+* Python 3.12.0 or higher (IMPORTANT)
 * Internet connection
 
 All required dependencies are automatically installed with the package.
@@ -117,8 +109,8 @@ All required dependencies are automatically installed with the package.
 ```python
 from sentimentscopeai import SentimentScopeAI
 
-# MAKE SURE TO PASS IN: current_folder/json_file_name, not just json_file_name if the following doesn't work
-review_bot = SentimentScopeAI("json_file_name", "company_name", "service_name")
+# MAKE SURE TO PASS IN: <current_folder/file_name.json>, not just <file_name.json> if the following doesn't work
+review_bot = SentimentScopeAI("file_name.json", "company_name", "service_name")
 
 print(review_bot.generate_summary())
 ```
@@ -155,7 +147,8 @@ Missing fields, incorrect keys, or non-JSON formats will cause parsing errors.
 * No comments
 * Must be a list ([]), not a single object
 
-You can use a JSON validator if you are unsure.
+You can use a JSON validator if you are unsure. 
+Check out: [https://jsonlint.com/]
 
 3.) One Company & One Service per JSON File (Required)
 
@@ -188,13 +181,14 @@ If you want to use the automated scraping feature, install the required browser:
 playwright install chromium
 ```
 
-### Example Usage
+### Example Usage (after playwright install chromium)
 ```python
-from SentimentScopeAI import sentimentscopeai as ssAI
+from sentimentscopeai import SentimentScopeAI
 
-bot = ssAI.SentimentScopeAI("iphone_reviews.json", "<Company Name>", "<Service Name>")
+# MAKE SURE TO PASS IN: <current_folder/file_name.json>, not just <file_name.json> if the following doesn't work
+review_bot = SentimentScopeAI("file_name.json", "company_name", "service_name")
 
-bot.import_yelp_reviews("https://www.yelp.com/biz/business-name-city#reviews")
+review_bot.import_yelp_reviews("https://www.yelp.com/biz/business-name-here#reviews")
 
 print(bot.generate_summary())
 ```
@@ -202,12 +196,15 @@ print(bot.generate_summary())
 ### Supported Platforms
 - Yelp Reviews [https://www.yelp.com/]
 
-### Important Notes
-- Scraping may take several minutes for businesses with many reviews
+### IMPORTANT NOTES
+- Scraping may take several minutes to an hour for businesses with many reviews
 - The feature includes anti-detection measures and random delays
 - Reviews are automatically cleaned and formatted
 - For best results, ensure a stable internet connection
+- For faster processing of a large dataset, a dedicated NVIDIA GPU with CUDA is highly recommended
 
 ### Disclaimer: 
 
-SentimentScopeAI is provided **as-is** and is **not liable** for any damages arising from its use. All input data is **processed locally** and is **not used for model training** or retained beyond execution. **Do not include personal, sensitive, or confidential information** in review data. SentimentScopeAI **may produce incomplete summaries or misclassify sentiment**. Always **verify critical insights** before making business decisions. **Web Scraping Notice:** SentimentScopeAI is **not affiliated with, endorsed by, or partnered with Yelp Inc.** Users are **solely responsible for complying with Yelp's Terms of Service** and applicable laws. This feature is provided for **research and personal use only**. Users are **responsible for ensuring ethical and appropriate use** of this system.
+SentimentScopeAI is provided **as-is** and is **not liable** for any damages arising from its use. All input data is **processed locally** and is **not used for model training** or retained beyond execution. **Do not include personal, sensitive, or confidential information** in review data. SentimentScopeAI **may produce incomplete summaries or misclassify sentiment**. Always **verify critical insights** before making business decisions. 
+
+**Web Scraping Notice:** SentimentScopeAI is **not affiliated with, endorsed by, or partnered with Yelp Inc.** Users are **solely responsible for complying with Yelp's Terms of Service** and applicable laws. This feature is provided for **research and personal use only**. Users are **responsible for ensuring ethical and appropriate use** of this system.
