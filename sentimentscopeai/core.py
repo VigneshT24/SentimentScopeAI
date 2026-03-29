@@ -7,6 +7,18 @@ import textwrap
 import time
 import sys
 import threading
+import warnings
+import logging
+
+os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+os.environ["HF_HUB_VERBOSITY"] = "error"
+os.environ["ACCELERATE_LOG_LEVEL"] = "error"
+warnings.filterwarnings("ignore")
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("accelerate").setLevel(logging.ERROR)
+
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
 from seleniumbase import sb_cdp
