@@ -95,7 +95,8 @@ What Happens Internally
 
 ## Runtime Analysis
 
-![ssAI Runtime Performance Metric Graph](https://github.com/user-attachments/assets/d987262a-e225-42c1-b8eb-667977f425f8)
+
+![ssAI Runtime Performance Metric Graph](https://github.com/user-attachments/assets/0f43f3da-92d7-4356-b80a-0a095a91b4c6)
 
 **NOTE**
 - **Time Complexity:** Θ(N) with empirical R² = 0.998
