@@ -11,36 +11,6 @@ SentimentScopeAI is a Python-based NLP system that leverages PyTorch and Hugging
 SentimentScopeAI is designed to answer this one main question:
 * What concerns can be derived from a massive set of collective sentiment?
 
-## Features
-
-1.) Pre-Trained Sentiment Modeling (PyTorch + HuggingFace)
-* Uses pre-trained transformer models from HuggingFace
-* Integrated via PyTorch for inference and extensibility
-* Enables robust sentiment understanding without training from scratch
-
-2.) Rating Meaning Inference
-* Implemented the infer_rating_meaning() function
-* Converts numerical ratings (1–5) into semantic interpretations
-* Uses sentiment signals, linguistic tone, and contextual cues
-* Handles:
-  * Mixed sentiment
-  * Neutral or ambiguous phrasing
-  * Disagreement between rating score and review text
-
-3.) Explainable, Deterministic Pipeline
-* Downstream reasoning is transparent and testable
-* No opaque end-to-end predictions
-* Model outputs are interpreted rather than blindly trusted
-* Designed for debugging, auditing, and future research extension
-
-4.) Summary Generation
-* Read all reviews for a given product or service
-* Aggregate sentiment signals across users
-* Detect recurring strengths and weaknesses
-* Generate a summary of all concerns to help stakeholders
-
-These steps transition the system from analysis → reasoning → recommendation generation.
-
 Example:
 ```
 For <Company Name>'s <Service Name>: overall sentiment is mixed reflecting a balance
@@ -121,6 +91,18 @@ What Happens Internally
 * Sentiment is inferred using pre-trained transformer models (PyTorch + HuggingFace)
 * Rating meanings are semantically interpreted
 * Flan-T5 finds the negatives from each review and summarizes the whole file
+
+
+## Runtime Analysis
+
+![ssAI Runtime Performance Metric Graph](https://github.com/user-attachments/assets/d987262a-e225-42c1-b8eb-667977f425f8)
+
+**NOTE**
+- **Time Complexity:** Θ(N) with empirical R² = 0.998
+- **Throughput:** ~100 reviews/minute
+- **Benchmark Hardware:** NVIDIA RTX 3050 (CUDA-enabled)
+- **Performance Variance:** Execution time scales with GPU capabilities, VRAM, and CUDA compatibility
+
 
 ## Important Notice:
 
