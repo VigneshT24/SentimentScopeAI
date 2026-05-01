@@ -592,7 +592,7 @@ class SentimentScopeAI:
 
             Args:
                 batch_size (int): number that indicates how much customer reviews should be
-                in a batch per process
+                in a batch per process (recommend 2 or 4 for reducing overhead)
 
             Returns:
                 str
