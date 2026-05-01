@@ -236,8 +236,11 @@ class SentimentScopeAI:
             unique.append(set_sentence)
 
         return unique
+    
+    def __extract_negative_aspects_batch(self, batch_of_reviews: list) -> list[str]:
+        pass
    
-    def __extract_negative_aspects(self, review: str) -> list[str]:
+    def __extract_negative_aspects_single(self, review: str) -> list[str]:
         """
             Extract actionable negative aspects from a review using AI-based text generation.
             
@@ -565,7 +568,7 @@ class SentimentScopeAI:
         except Exception as e:
             print(f"Unexpected error: {e}")
 
-    def generate_summary(self) -> str:
+    def generate_summary(self, batch_size) -> str:
         """
             Generate a formatted sentiment summary based on user reviews for a service.
 
@@ -583,7 +586,8 @@ class SentimentScopeAI:
             decoded properly.
 
             Args:
-                None
+                batch_size (int): number (default 16), that indicates how much customer reviews should be
+                in a batch per process
 
             Returns:
                 str
@@ -600,10 +604,15 @@ class SentimentScopeAI:
             reviews = []
             with open(self.__json_file_path, 'r', encoding="utf-8") as file:
                 company_reviews = json.load(file)
-                for i, entry in enumerate(company_reviews, 1):
-                    for part in self.__extract_negative_aspects(entry):
-                        self.__notable_negatives.append(part)
-                    reviews.append(entry)
+
+                for i in range (0, len(company_reviews), batch_size):
+                    batch = company_reviews[i : (i + batch_size)]
+
+                    batch_issues = self.__extract_negative_aspects_batch(batch)
+                    self.__notable_negatives.extend(batch_issues)
+
+                    reviews.extend(batch)
+
         except FileNotFoundError:
             return ("JSON file path is unidentifiable, please try inputting the name properly (e.g. \"companyreview.json\").")
         except json.JSONDecodeError:
