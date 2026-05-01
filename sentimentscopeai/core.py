@@ -23,7 +23,9 @@ from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
 from seleniumbase import sb_cdp
 from difflib import SequenceMatcher
-from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM, T5ForConditionalGeneration, T5Tokenizer, set_seed)
+from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM,
+                          T5ForConditionalGeneration, T5Tokenizer, set_seed)
+
 
 class SentimentScopeAI:
     ## Private attributes
@@ -66,7 +68,7 @@ class SentimentScopeAI:
         SentimentScopeAI can make mistakes. This AI may produce incomplete summaries,
         misclassify sentiment, or categorize positive feedback as negative. Please
         verify critical insights before making decisions based on this analysis.
-        
+
         Web scraping feature: SentimentScopeAI is not affiliated with, endorsed by,
         or partnered with Yelp Inc. Users are responsible for complying with Yelp's
         Terms of Service. This feature is provided for research and personal use only.
@@ -123,7 +125,7 @@ class SentimentScopeAI:
                 self.__extraction_model_name
             )
         return self.__extraction_tokenizer
-   
+
     def __time_threading(self) -> None:
         """Time Threading for elapsed timer while SentimentScopeAI processes"""
         start_time = time.time()
@@ -131,39 +133,12 @@ class SentimentScopeAI:
             elapsed_time = time.time() - start_time
             mins, secs = divmod(elapsed_time, 60)
             hours, mins = divmod(mins, 60)
-           
+
             timer_display = f"SentimentScopeAI is processing (elapsed time): {int(hours):02}:{int(mins):02}:{int(secs):02}"
             sys.stdout.write('\r' + timer_display)
             sys.stdout.flush()
-           
+
             time.sleep(0.1)
-
-    def __get_predictive_star(self, text: str) -> int:
-        """
-            Predict the sentiment star rating for the given text review.
-
-            Args:
-                text (str): The text review to analyze.
-            Returns:
-                int: The predicted star rating (1 to 5).
-        """
-        max_len = getattr(self.pytorch_tokenizer, "model_max_length", 512)
-
-        inputs = self.pytorch_tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=max_len
-        ).to(self.__device)
-
-        with torch.no_grad():
-            outputs = self.pytorch_model(**inputs)
-
-        logits = outputs.logits
-        prediction = torch.argmax(logits, dim=-1).item()
-
-        num_star = prediction + 1
-        return num_star
 
     def __calculate_all_review(self) -> int:
         """
@@ -177,14 +152,32 @@ class SentimentScopeAI:
         # don't need try-catch because it is handled in generate_summary()
         with open(self.__json_file_path, 'r', encoding="utf-8") as reviews_file:
             all_reviews = json.load(reviews_file)
-            sum = 0
-            num_reviews = 0
-            for i, entry in enumerate(all_reviews, 1):
-                single_review_rating = self.__get_predictive_star(entry)
-                sum += single_review_rating
-                num_reviews = i
-        return (sum / num_reviews) if num_reviews != 0 else 0
-   
+
+            if not all_reviews:
+                return 0
+
+            total_stars = 0
+            batch_size = 32
+
+            for i in range(0, len(all_reviews), batch_size):
+                batch = all_reviews[i : (i + batch_size)]
+
+                inputs = self.pytorch_tokenizer(
+                    batch,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=512,
+                    padding=True
+                ).to(self.__device)
+
+                with torch.no_grad():
+                    outputs = self.pytorch_model(**inputs)
+
+                predictions = torch.argmax(outputs.logits, dim=-1)
+                total_stars += (predictions + 1).sum().item()
+
+            return total_stars / len(all_reviews)
+
     def __paraphrase_statement(self, statement: str) -> list[str]:
         """
             Generates multiple unique paraphrased variations of a given string.
@@ -200,8 +193,8 @@ class SentimentScopeAI:
                 list[str]: A list of unique, cleaned paraphrased strings.
                     Returns [""] if the input is None, empty, or whitespace.
         """
-        set_seed(random.randint(0, 2**32 - 1))
-       
+        set_seed(random.randint(0, 2 ** 32 - 1))
+
         if statement is None or statement.isspace() or statement == "":
             return [""]
 
@@ -214,13 +207,13 @@ class SentimentScopeAI:
             do_sample=True,
             top_p=0.99,
             top_k=50,
-            temperature= 1.0,
+            temperature=1.0,
             num_return_sequences=5,
             repetition_penalty=1.2,
         )
 
         resultant = self.hf_tokenizer.batch_decode(output, skip_special_tokens=True)
-       
+
         seen = set()
         unique = []
         translator = str.maketrans('', '', string.punctuation)
@@ -236,82 +229,89 @@ class SentimentScopeAI:
             unique.append(set_sentence)
 
         return unique
-   
-    def __extract_negative_aspects(self, review: str) -> list[str]:
+
+    def __extract_negative_aspects_batch(self, batch_of_reviews: list) -> list[str]:
         """
-            Extract actionable negative aspects from a review using AI-based text generation.
-            
-            This method uses the Flan-T5 language model to identify specific, constructive
-            problems mentioned in a review. Unlike simple sentiment analysis, this extracts
-            concrete issues that describe what is broken, missing, or difficult - filtering
-            out vague emotional words like "horrible" or "bad".
-            
-            Args:
-                review (str): The review text to analyze for negative aspects.
-            
-            Returns:
-                list[str]: A list of specific problem phrases extracted from the review.
-            
-            Note:
-                This method uses the Flan-T5 model which is loaded lazily on first use.
-                Processing time depends on review length and available hardware (CPU/GPU).
-                Very short outputs (<=3 characters) are filtered out as likely artifacts.
+        Extract actionable negative aspects from multiple reviews simultaneously using batch processing.
+
+        This method processes multiple reviews in parallel on the GPU, significantly improving
+        throughput compared to sequential processing.
+
+        Args:
+            batch_of_reviews (list[str]): List of review texts to analyze for negative aspects
+
+        Returns:
+            list[str]: All extracted problem phrases from all reviews in the batch
         """
-        if not review or review.isspace():
+
+        if not batch_of_reviews:
             return []
 
-        prompt = f"""
-        Task: Extract ONE specific operational issue from the review in 6-14 words.
+        prompts = []
+        valid_indices = []
 
-        Rules:
-        - if there is no clear issue, only vague emotions, or positive review, then Output: none
-        - Output the concrete problem using ONLY words from the review, but be concise
-        - Include specific details (numbers, times, items) when mentioned
-        - Keep role descriptions, if there are any, BUT remove person names
+        for index, review in enumerate(batch_of_reviews):
+            if not review or review.isspace():
+                continue
 
-        Examples:
+            prompt = f"""
+            Task: Extract ONE specific operational issue from the review in 6-14 words.
 
-        Review: "Waited 2 hours past scheduled time with no explanation given."
-        Answer: waited 2 hours past scheduled time no explanation
+            Rules:
+            - if there is no clear issue, only vague emotions, or positive review, then Output: none
+            - Output the concrete problem using ONLY words from the review, but be concise
+            - Include specific details (numbers, times, items) when mentioned
+            - Keep role descriptions, if there are any, BUT remove person names
 
-        Review: "Terrible experience, worst place ever, never again!"
-        Answer: none
+            Examples:
 
-        Review: "Was charged $50 extra fee that wasn't mentioned upfront."
-        Answer: charged 50 dollar extra fee not mentioned upfront
+            Review: "Waited 2 hours past scheduled time with no explanation given."
+            Answer: waited 2 hours past scheduled time no explanation
 
-        Review: "Staff was extremely rude and unprofessional throughout."
-        Answer: none
+            Review: "Terrible experience, worst place ever, never again!"
+            Answer: none
 
-        Review: "Ordered item A but received item B, return process unclear."
-        Answer: ordered item a received item b return unclear
+            Review: "Was charged $50 extra fee that wasn't mentioned upfront."
+            Answer: charged 50 dollar extra fee not mentioned upfront
 
-        Review: "System crashed three times during checkout process."
-        Answer: system crashed three times during checkout
+            Review: "Staff was extremely rude and unprofessional throughout."
+            Answer: none
 
-        Review: "Amazing service, highly recommend to everyone!"
-        Answer: none
+            Review: "Ordered item A but received item B, return process unclear."
+            Answer: ordered item a received item b return unclear
 
-        Review: "Called customer support 5 times, never got callback as promised."
-        Answer: called support 5 times never got promised callback
+            Review: "System crashed three times during checkout process."
+            Answer: system crashed three times during checkout
 
-        Review: "Product arrived damaged with missing parts, no replacement offered."
-        Answer: product arrived damaged missing parts no replacement offered
+            Review: "Amazing service, highly recommend to everyone!"
+            Answer: none
 
-        Review: "Unbelievable how bad this was, absolutely horrible."
-        Answer: none
+            Review: "Called customer support 5 times, never got callback as promised."
+            Answer: called support 5 times never got promised callback
 
-        Review: "{review}"
-        Answer:
-        """.strip()
+            Review: "Product arrived damaged with missing parts, no replacement offered."
+            Answer: product arrived damaged missing parts no replacement offered
+
+            Review: "Unbelievable how bad this was, absolutely horrible."
+            Answer: none
+
+            Review: "{review}"
+            Answer:
+            """.strip()
+
+            prompts.append(prompt)
+            valid_indices.append(index)
+
+        if not prompts:
+            return []
 
         inputs = self.extraction_tokenizer(
-            prompt,
+            prompts,
             return_tensors="pt",
             max_length=512,
-            truncation=True
+            truncation=True,
+            padding=True
         ).to(self.__device)
-
 
         outputs = self.extraction_model.generate(
             **inputs,
@@ -322,27 +322,29 @@ class SentimentScopeAI:
             early_stopping=True,
         )
 
-        result = self.extraction_tokenizer.decode(outputs[0], skip_special_tokens=True)
-        if result.strip().lower() in ['none', 'none.', 'no problems', '']:
-            return []
-        
-        issues = []
-        for line in result.split('\n'):
-            line = line.strip()
-            line = line.lstrip('•-*1234567890.) ')
-            line = line.replace("Answer:", "").replace("answer:", "").strip()
-            if line and len(line) > 3:
-                issues.append(line)
-        
-        if not issues:
-            return []
+        all_issues = []
 
+        for output in outputs:
+            result = self.extraction_tokenizer.decode(output, skip_special_tokens=True)
 
-        if not (self.__validate_issue(issues[0])):
-            return []
-        
-        return issues
-    
+            if result.strip().lower() in ['none', 'none.', 'no problems', '']:
+                continue
+
+            issues = []
+            for line in result.split('\n'):
+                line = line.strip()
+                line = line.lstrip('•-*1234567890.) ')
+                if line and len(line) > 3:
+                    issues.append(line)
+
+            if not issues:
+                continue
+
+            if self.__validate_issue(issues[0]):
+                all_issues.extend(issues)
+
+        return all_issues
+
     def __infer_rating_meaning(self) -> str:
         """
             Translates numerical rating scores into descriptive, paraphrased sentiment.
@@ -365,19 +367,24 @@ class SentimentScopeAI:
             return "JSON FILE PATH IS UNIDENTIFIABLE, please try inputting the name properly (e.g. \"companyreview.json\")."
 
         def generate_sentence(rating_summ):
-            return f"For {self.__company_name}'s {self.__service_name}: " + random.choice(self.__paraphrase_statement(rating_summ)).strip()
+            return f"For {self.__company_name}'s {self.__service_name}: " + random.choice(
+                self.__paraphrase_statement(rating_summ)).strip()
 
         if 1.0 <= overall_rating < 2.0:
-            return generate_sentence("Overall sentiment is very negative, indicating widespread dissatisfaction among users.")
+            return generate_sentence(
+                "Overall sentiment is very negative, indicating widespread dissatisfaction among users.")
         elif 2.0 <= overall_rating < 3.0:
-            return generate_sentence("Overall sentiment is negative, suggesting notable dissatisfaction across reviews.")
+            return generate_sentence(
+                "Overall sentiment is negative, suggesting notable dissatisfaction across reviews.")
         elif 3.0 <= overall_rating < 4.0:
-            return generate_sentence("Overall sentiment is mixed, reflecting a balance of positive and negative feedback.")
+            return generate_sentence(
+                "Overall sentiment is mixed, reflecting a balance of positive and negative feedback.")
         elif 4.0 <= overall_rating < 5.0:
             return generate_sentence("Overall sentiment is positive, indicating general user satisfaction.")
         else:
-            return generate_sentence("Overall sentiment is very positive, reflecting strong user approval and satisfaction.")
-   
+            return generate_sentence(
+                "Overall sentiment is very positive, reflecting strong user approval and satisfaction.")
+
     def __validate_issue(self, extracted_issue: str) -> bool:
         """
             Determine whether an extracted line represents a true negative issue.
@@ -395,7 +402,7 @@ class SentimentScopeAI:
 
         if not extracted_issue:
             return False
-       
+
         vprompt = f"""
         You are a strict polarity verifier for extracted "issues" across many industries.
 
@@ -455,15 +462,16 @@ class SentimentScopeAI:
         OUTPUT:
         """.strip()
 
-        validator_in = self.extraction_tokenizer(vprompt, return_tensors="pt", max_length=512, truncation=True).to(self.__device)
+        validator_in = self.extraction_tokenizer(vprompt, return_tensors="pt", max_length=512, truncation=True).to(
+            self.__device)
         validator_out = self.extraction_model.generate(**validator_in, max_new_tokens=5, num_beams=1, do_sample=False)
         verdict = self.extraction_tokenizer.decode(validator_out[0], skip_special_tokens=True).strip().upper()
         return verdict == "YES"
-    
+
     def __frequency_rank(self, list_of_concerns) -> list[tuple]:
         freq_groups = []
 
-        for concern in list_of_concerns:    
+        for concern in list_of_concerns:
             best_match = -1
             best_ratio = 0
 
@@ -473,33 +481,33 @@ class SentimentScopeAI:
                     best_ratio = ratio
                     best_match = i
 
-            if best_ratio >= 0.50: 
+            if best_ratio >= 0.50:
                 freq_phrase, count = freq_groups[best_match]
                 freq_groups[best_match] = (freq_phrase, count + 1)
-            else: 
+            else:
                 freq_groups.append((concern, 1))
-            
+
         return sorted(freq_groups, key=lambda x: x[1], reverse=True)
 
     def import_yelp_reviews(self, url) -> None:
         """
         Automatically imports customer reviews from a Yelp business page using web scraping.
-        
+
         This method navigates through all available review pages on Yelp, extracts review text content,
-        cleans and formats the data, and saves it to a JSON file. The scraper handles pagination 
+        cleans and formats the data, and saves it to a JSON file. The scraper handles pagination
         automatically and continues until all reviews are retrieved from the business listing.
-        
+
         Args:
             url (str): The complete Yelp business URL including the reviews section.
-        
+
         Returns:
-            None 
-        
+            None
+
         Raises:
             TimeoutError: If the page fails to load or reviews cannot be found within the timeout period.
             IOError: If the JSON file cannot be written due to permissions or disk space issues.
             Exception: If scraping fails due to connectivity issues or changes in Yelp's page structure.
-        
+
         Note:
             - This feature requires an active internet connection
             - Scraping may take several minutes for businesses with many reviews
@@ -536,13 +544,13 @@ class SentimentScopeAI:
             # scrape all the reviews by scraping -> next page -> scraping...
             while True:
                 review_texts = page.query_selector_all(review_selector)
-                
+
                 for text in review_texts:
                     text = text.inner_text()
                     cleaned_text = text.replace('\n', ' ').strip()
                     cleaned_text = ' '.join(cleaned_text.split())
                     reviews.append(cleaned_text)
-                
+
                 next_btn = page.query_selector("a.next-link[aria-label='Next']")
 
                 if not next_btn:
@@ -553,7 +561,7 @@ class SentimentScopeAI:
                 next_btn.click()
                 time.sleep(random.uniform(4, 7))
 
-            # safetly close the browser once all is done
+            # safely close the browser once all is done
             browser.close()
 
         try:
@@ -565,7 +573,7 @@ class SentimentScopeAI:
         except Exception as e:
             print(f"Unexpected error: {e}")
 
-    def generate_summary(self) -> str:
+    def generate_summary(self, batch_size) -> str:
         """
             Generate a formatted sentiment summary based on user reviews for a service.
 
@@ -583,7 +591,8 @@ class SentimentScopeAI:
             decoded properly.
 
             Args:
-                None
+                batch_size (int): number that indicates how much customer reviews should be
+                in a batch per process (recommend 2 or 4 for reducing overhead)
 
             Returns:
                 str
@@ -600,10 +609,15 @@ class SentimentScopeAI:
             reviews = []
             with open(self.__json_file_path, 'r', encoding="utf-8") as file:
                 company_reviews = json.load(file)
-                for i, entry in enumerate(company_reviews, 1):
-                    for part in self.__extract_negative_aspects(entry):
-                        self.__notable_negatives.append(part)
-                    reviews.append(entry)
+
+                for i in range (0, len(company_reviews), batch_size):
+                    batch = company_reviews[i : (i + batch_size)]
+
+                    batch_issues = self.__extract_negative_aspects_batch(batch)
+                    self.__notable_negatives.extend(batch_issues)
+
+                    reviews.extend(batch)
+
         except FileNotFoundError:
             return ("JSON file path is unidentifiable, please try inputting the name properly (e.g. \"companyreview.json\").")
         except json.JSONDecodeError:
@@ -650,14 +664,14 @@ class SentimentScopeAI:
                 lines.append(wrapper.fill(label))
 
             return "\n".join(lines)
-       
+
         self.__stop_timer.set()
         self.__timer_thread.join()
         print()
         print()
 
         rating_meaning = self.__infer_rating_meaning()
-       
+
         parts = [textwrap.fill(rating_meaning, width=70)]
 
         if self.__calculate_all_review() >= 4:
