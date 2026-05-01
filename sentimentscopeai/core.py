@@ -138,8 +138,11 @@ class SentimentScopeAI:
            
             time.sleep(0.1)
 
+    # deprecated method (to be removed soon)
     def __get_predictive_star(self, text: str) -> int:
         """
+            (DEPRECATED METHOD - TO BE REMOVED SOON)
+
             Predict the sentiment star rating for the given text review.
 
             Args:
@@ -164,6 +167,44 @@ class SentimentScopeAI:
 
         num_star = prediction + 1
         return num_star
+
+    # def __calculate_all_review(self) -> int:
+    #     """
+    #         Calculate and print the predicted star ratings for all reviews in the JSON file.
+
+    #         Args:
+    #             None
+    #         Returns:
+    #             tuple: A tuple containing the total number of reviews and the average star rating.
+    #     """
+    #     # don't need try-catch because it is handled in generate_summary()
+    #     with open(self.__json_file_path, 'r', encoding="utf-8") as reviews_file:
+    #         all_reviews = json.load(reviews_file)
+
+    #         if not all_reviews:
+    #             return 0
+            
+    #         total_stars = 0
+    #         batch_size = 32
+
+    #         for i in range(0, len(all_reviews), batch_size):
+    #             batch = all_reviews[i : (i + batch_size)]
+
+    #             inputs = self.pytorch_tokenizer(
+    #                 batch, 
+    #                 return_tensors="pt",
+    #                 truncation=True,
+    #                 max_length=512,
+    #                 padding=True
+    #             ).to(self.__device)
+
+    #             with torch.no_grad():
+    #                 outputs = self.pytorch_model(**inputs)
+                
+    #             predictions = torch.argmax(outputs.logits, dim=-1)
+    #             total_stars += (predictions + 1).sum().item()
+
+    #         return total_stars / len(all_reviews)
 
     def __calculate_all_review(self) -> int:
         """
@@ -238,11 +279,126 @@ class SentimentScopeAI:
         return unique
     
     def __extract_negative_aspects_batch(self, batch_of_reviews: list) -> list[str]:
-        pass
+        """
+        Extract actionable negative aspects from multiple reviews simultaneously using batch processing.
+        
+        This method processes multiple reviews in parallel on the GPU, significantly improving
+        throughput compared to sequential processing.
+        
+        Args:
+            reviews (list[str]): List of review texts to analyze for negative aspects
+        
+        Returns:
+            list[str]: All extracted problem phrases from all reviews in the batch
+        """
+
+        if not batch_of_reviews:
+            return[]
+        
+        prompts = []
+        valid_indices = []
+
+        for index, review in enumerate(batch_of_reviews):
+            if not review or review.isspace():
+                continue
+
+            prompt = f"""
+            Task: Extract ONE specific operational issue from the review in 6-14 words.
+
+            Rules:
+            - if there is no clear issue, only vague emotions, or positive review, then Output: none
+            - Output the concrete problem using ONLY words from the review, but be concise
+            - Include specific details (numbers, times, items) when mentioned
+            - Keep role descriptions, if there are any, BUT remove person names
+
+            Examples:
+
+            Review: "Waited 2 hours past scheduled time with no explanation given."
+            Answer: waited 2 hours past scheduled time no explanation
+
+            Review: "Terrible experience, worst place ever, never again!"
+            Answer: none
+
+            Review: "Was charged $50 extra fee that wasn't mentioned upfront."
+            Answer: charged 50 dollar extra fee not mentioned upfront
+
+            Review: "Staff was extremely rude and unprofessional throughout."
+            Answer: none
+
+            Review: "Ordered item A but received item B, return process unclear."
+            Answer: ordered item a received item b return unclear
+
+            Review: "System crashed three times during checkout process."
+            Answer: system crashed three times during checkout
+
+            Review: "Amazing service, highly recommend to everyone!"
+            Answer: none
+
+            Review: "Called customer support 5 times, never got callback as promised."
+            Answer: called support 5 times never got promised callback
+
+            Review: "Product arrived damaged with missing parts, no replacement offered."
+            Answer: product arrived damaged missing parts no replacement offered
+
+            Review: "Unbelievable how bad this was, absolutely horrible."
+            Answer: none
+
+            Review: "{review}"
+            Answer:
+            """.strip()
+
+            prompts.append(prompt)
+            valid_indices.append(index)
+
+        if not prompts:
+            return []
+        
+        inputs = self.extraction_tokenizer(
+            prompts,
+            return_tensors="pt",
+            max_length=512,
+            truncation=True,
+            padding=True
+        ).to(self.__device)
+
+        outputs = self.extraction_model.generate(
+            **inputs,
+            max_new_tokens=30,
+            num_beams=5,
+            do_sample=False,
+            no_repeat_ngram_size=3,
+            early_stopping=True,
+        )
+
+        all_issues = []
+
+        for output in outputs:
+            result = self.extraction_tokenizer.decode(output, skip_special_tokens=True)
+
+            if result.strip().lower() in ['none', 'none.', 'no problems', '']:
+                continue
+
+            issues = []
+            for line in result.split('\n'):
+                line = line.strip()
+                line = line.lstrip('•-*1234567890.) ')
+                if line and len(line) > 3:
+                    issues.append(line)
+
+            if not issues:
+                continue
+
+            if self.__validate_issue(issues[0]):
+                all_issues.extend(issues)
+
+        return all_issues
    
+    # deprecated method (to be removed soon)
     def __extract_negative_aspects_single(self, review: str) -> list[str]:
         """
-            Extract actionable negative aspects from a review using AI-based text generation.
+            (DEPRECATED METHOD - TO BE REMOVED SOON)
+
+            Extract actionable negative aspects from a review using single processing.
             
             This method uses the Flan-T5 language model to identify specific, constructive
             problems mentioned in a review. Unlike simple sentiment analysis, this extracts
@@ -568,7 +724,122 @@ class SentimentScopeAI:
         except Exception as e:
             print(f"Unexpected error: {e}")
 
-    def generate_summary(self, batch_size) -> str:
+    # def generate_summary(self, batch_size) -> str:
+    #     """
+    #         Generate a formatted sentiment summary based on user reviews for a service.
+
+    #         This method reads a JSON file containing user reviews, infers the overall
+    #         sentiment rating, and produces a structured, human-readable summary.
+    #         The summary includes:
+    #             - A concise explanation of the inferred sentiment rating
+    #             - A numbered list of representative negatives mentioned
+
+    #         Long-form reviews are wrapped to a fixed line width while preserving
+    #         list structure and readability.
+
+    #         The method is resilient to common file and parsing errors and will
+    #         emit descriptive messages if the input file cannot be accessed or
+    #         decoded properly.
+
+    #         Args:
+    #             batch_size (int): number (default 16), that indicates how much customer reviews should be
+    #             in a batch per process
+
+    #         Returns:
+    #             str
+    #                 A multi-paragraph, text-wrapped sentiment summary suitable for
+    #                 console output, logs, or reports.
+
+    #         Raises:
+    #             None
+    #                 All exceptions are handled internally with descriptive error
+    #                 messages to prevent interruption of execution.
+    #     """
+    #     self.__timer_thread.start()
+    #     try:
+    #         reviews = []
+    #         with open(self.__json_file_path, 'r', encoding="utf-8") as file:
+    #             company_reviews = json.load(file)
+
+    #             for i in range (0, len(company_reviews), batch_size):
+    #                 batch = company_reviews[i : (i + batch_size)]
+
+    #                 batch_issues = self.__extract_negative_aspects_single(batch)
+    #                 self.__notable_negatives.extend(batch_issues)
+
+    #                 reviews.extend(batch)
+
+    #     except FileNotFoundError:
+    #         return ("JSON file path is unidentifiable, please try inputting the name properly (e.g. \"companyreview.json\").")
+    #     except json.JSONDecodeError:
+    #         return ("Could not decode JSON file. Check for valid JSON syntax (look at GitHub/PyPi Readme Instructions).")
+    #     except PermissionError:
+    #         return ("Permission denied to open the JSON file.")
+    #     except Exception as e:
+    #         return (f"An unexpected error occured: {e}")
+
+    #     resulting_loc = self.__frequency_rank(self.__notable_negatives)
+
+    #     def format_numbered_list(items):
+    #         if not items:
+    #             return "None found"
+
+    #         lines = []
+    #         flag = False
+    #         recurring_counter = 1
+    #         other_counter = 1
+
+    #         lines.append("MOST FREQUENT CONCERNS:")
+
+    #         for item in items:
+    #             phrase, count = item
+
+    #             if not flag and count < 2:
+    #                 lines.append("\nOTHER CONCERNS:")
+    #                 flag = True
+
+    #             if count >= 2:
+    #                 prefix = f"{recurring_counter}) "
+    #                 recurring_counter += 1
+    #             else:
+    #                 prefix = f"{other_counter}) "
+    #                 other_counter += 1
+
+    #             wrapper = textwrap.TextWrapper(
+    #                 width=70,
+    #                 initial_indent=prefix,
+    #                 subsequent_indent=" " * len(prefix)
+    #             )
+
+    #             label = f"{phrase} ({count} customers)" if count >= 2 else phrase
+    #             lines.append(wrapper.fill(label))
+
+    #         return "\n".join(lines)
+       
+    #     self.__stop_timer.set()
+    #     self.__timer_thread.join()
+    #     print()
+    #     print()
+
+    #     rating_meaning = self.__infer_rating_meaning()
+       
+    #     parts = [textwrap.fill(rating_meaning, width=70)]
+
+    #     if self.__calculate_all_review() >= 4:
+    #         parts.append(
+    #             textwrap.fill(
+    #                 "Since the overall rating is good, I don't have any notable negatives to mention.",
+    #                 width=70))
+    #     else:
+    #         parts.append(
+    #             textwrap.fill(
+    #                 "The following reviews highlight some concerns users have expressed:",
+    #                 width=70))
+    #         parts.append(format_numbered_list(resulting_loc))
+
+    #     return "\n\n".join(parts)
+
+    def generate_summary(self) -> str:
         """
             Generate a formatted sentiment summary based on user reviews for a service.
 
@@ -586,8 +857,7 @@ class SentimentScopeAI:
             decoded properly.
 
             Args:
-                batch_size (int): number (default 16), that indicates how much customer reviews should be
-                in a batch per process
+                None
 
             Returns:
                 str
@@ -604,15 +874,10 @@ class SentimentScopeAI:
             reviews = []
             with open(self.__json_file_path, 'r', encoding="utf-8") as file:
                 company_reviews = json.load(file)
-
-                for i in range (0, len(company_reviews), batch_size):
-                    batch = company_reviews[i : (i + batch_size)]
-
-                    batch_issues = self.__extract_negative_aspects_batch(batch)
-                    self.__notable_negatives.extend(batch_issues)
-
-                    reviews.extend(batch)
-
+                for i, entry in enumerate(company_reviews, 1):
+                    for part in self.__extract_negative_aspects_single(entry):
+                        self.__notable_negatives.append(part)
+                    reviews.append(entry)
         except FileNotFoundError:
             return ("JSON file path is unidentifiable, please try inputting the name properly (e.g. \"companyreview.json\").")
         except json.JSONDecodeError:
