@@ -28,20 +28,6 @@ OTHER CONCERNS:
 5) invitations and acceptances are terrible
 ```
 
-## System Architecture Overview
-
-```
-Reviews
-  ↓
-Pre-trained Transformer (HuggingFace + PyTorch)
-  ↓
-Sentiment Signals
-  ↓
-Rating Meaning Inference
-  ↓
-Summary Generation
-```
-
 ## Tech-Stack
 * **Language**: Python
 * **Deep Learning**: PyTorch
@@ -82,7 +68,7 @@ from sentimentscopeai import SentimentScopeAI
 # MAKE SURE TO PASS IN: <current_folder/file_name.json>, not just <file_name.json> if the following doesn't work
 review_bot = SentimentScopeAI("file_name.json", "company_name", "service_name")
 
-print(review_bot.generate_summary())
+print(review_bot.generate_summary(batch_size=8)) # read the rest of the README to learn more about batch_size
 ```
 
 What Happens Internally
@@ -106,6 +92,14 @@ What Happens Internally
 
 
 ## Important Notice:
+
+1.) Batch Size
+
+A newly added feature that allows users to configure the batch size, which determines the number of reviews processed simultaneously by the AI models before updating internal computations. The optimal batch size varies depending on hardware specifications. For lower-end dedicated GPUs or integrated GPUs with limited VRAM or system RAM, it is recommended to use a lower batch_size value (1, 2, or a maximum of 4) when calling the generate_summary() method. Conversely, if you are using a more capable GPU or computer with higher specifications, a higher batch_size value (8, 16, or 32) will yield significantly better performance. 
+
+However, it is NOT recommended to specify batch_size values exceeding 64, as this may cause system instability or application crashes. 
+
+The ability to configure batch_size is intentionally exposed to users to ensure maximum control over the software's behavior, allowing optimization based on individual hardware capabilities and performance requirements.
 
 1.) JSON Input Format (Required)
 
