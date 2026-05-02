@@ -95,7 +95,7 @@ What Happens Internally
 
 1.) Batch Size
 
-A newly added feature that allows users to configure the batch size, which determines the number of reviews processed simultaneously by the AI models before updating internal computations. The optimal batch size varies depending on hardware specifications. For lower-end dedicated GPUs or integrated GPUs with limited VRAM or system RAM, it is recommended to use a lower batch_size value (1, 2, or a maximum of 4) when calling the generate_summary() method. Conversely, if you are using a more capable GPU or computer with higher specifications, a higher batch_size value (8, 16, or 32) will yield significantly better performance. 
+A newly added feature that allows users to configure the batch size, which determines the number of reviews processed simultaneously by the AI models before updating internal computations. The optimal batch size varies depending on hardware specifications. For lower-end dedicated GPUs or integrated GPUs with limited VRAM or system RAM, it is recommended to use a smaller batch_size (1, 2, or 4) when calling the generate_summary() method. Conversely, if you are using a more capable GPU or a higher-spec computer, a larger batch_size (8, 16, or 32) will yield significantly better performance. 
 
 However, it is NOT recommended to specify batch_size values exceeding 64, as this may cause system instability or application crashes. 
 
@@ -167,7 +167,7 @@ review_bot = SentimentScopeAI("file_name.json", "company_name", "service_name")
 
 review_bot.import_yelp_reviews("https://www.yelp.com/biz/business-name-here#reviews")
 
-print(bot.generate_summary())
+print(bot.generate_summary(batch_size=16))
 ```
 
 ### Supported Platforms
