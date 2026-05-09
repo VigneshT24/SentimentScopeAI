@@ -26,7 +26,6 @@ from difflib import SequenceMatcher
 from transformers import (AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM,
                           T5ForConditionalGeneration, T5Tokenizer, set_seed)
 
-
 class SentimentScopeAI:
     ## Private attributes
     __hf_model_name = None
@@ -74,7 +73,15 @@ class SentimentScopeAI:
         Terms of Service. This feature is provided for research and personal use only.
         ─────────────────────────────────────────────────────────────────────────────
         """)
-        self.__device = "cuda" if torch.cuda.is_available() else "cpu"
+        if hasattr(torch, 'xpu') and torch.xpu.is_available():
+            self.__device = "xpu"
+            print(f"Using Intel Arc GPU: {torch.xpu.get_device_name(0)}\n")
+        elif torch.cuda.is_available():
+            self.__device = "cuda"
+            print(f"Using NVIDIA GPU (with CUDA): {torch.cuda.get_device_name(0)}\n")
+        else:
+            self.__device = "cpu"
+            print("Using CPU (No GPU detected)\n")
         self.__stop_timer = threading.Event()
         self.__timer_thread = threading.Thread(target=self.__time_threading)
 
@@ -82,23 +89,12 @@ class SentimentScopeAI:
     def hf_model(self):
         """Lazy loader for the Paraphrase Model."""
         if self.__hf_model is None:
-            self.__hf_model = AutoModelForSeq2SeqLM.from_pretrained(self.__hf_model_name)
+            self.__hf_model = AutoModelForSeq2SeqLM.from_pretrained(
+                self.__hf_model_name
+            ).to(self.__device)
+
         return self.__hf_model
-
-    @property
-    def hf_tokenizer(self):
-        """Lazy loader for the Paraphrase Tokenizer."""
-        if self.__hf_tokenizer is None:
-            self.__hf_tokenizer = T5Tokenizer.from_pretrained(self.__hf_model_name, legacy=True)
-        return self.__hf_tokenizer
-
-    @property
-    def pytorch_tokenizer(self):
-        """Lazy loader for the PyTorch Tokenizer."""
-        if self.__pytorch_tokenizer is None:
-            self.__pytorch_tokenizer = AutoTokenizer.from_pretrained(self.__pytorch_model_name)
-        return self.__pytorch_tokenizer
-
+    
     @property
     def pytorch_model(self):
         """Lazy loader for the PyTorch Model."""
@@ -106,8 +102,9 @@ class SentimentScopeAI:
             self.__pytorch_model = AutoModelForSequenceClassification.from_pretrained(
                 self.__pytorch_model_name
             ).to(self.__device)
-        return self.__pytorch_model
 
+        return self.__pytorch_model
+    
     @property
     def extraction_model(self):
         """Lazy loader for the Flan-T5 extraction model."""
@@ -115,15 +112,32 @@ class SentimentScopeAI:
             self.__extraction_model = T5ForConditionalGeneration.from_pretrained(
                 self.__extraction_model_name
             ).to(self.__device)
+
         return self.__extraction_model
+
+    @property
+    def hf_tokenizer(self):
+        """Lazy loader for the Paraphrase Tokenizer."""
+        if self.__hf_tokenizer is None:
+            self.__hf_tokenizer = T5Tokenizer.from_pretrained(self.__hf_model_name, legacy=True)
+
+        return self.__hf_tokenizer
+
+    @property
+    def pytorch_tokenizer(self):
+        """Lazy loader for the PyTorch Tokenizer."""
+        if self.__pytorch_tokenizer is None:
+            self.__pytorch_tokenizer = AutoTokenizer.from_pretrained(self.__pytorch_model_name)
+
+        return self.__pytorch_tokenizer
 
     @property
     def extraction_tokenizer(self):
         """Lazy loader for the Flan-T5 tokenizer."""
         if self.__extraction_tokenizer is None:
             self.__extraction_tokenizer = AutoTokenizer.from_pretrained(
-                self.__extraction_model_name
-            )
+                self.__extraction_model_name)
+
         return self.__extraction_tokenizer
 
     def __time_threading(self) -> None:
@@ -199,7 +213,7 @@ class SentimentScopeAI:
             return [""]
 
         prompt = f"paraphrase: {statement}"
-        encoder = self.hf_tokenizer(prompt, return_tensors="pt", truncation=True)
+        encoder = self.hf_tokenizer(prompt, return_tensors="pt", truncation=True).to(self.__device)
 
         output = self.hf_model.generate(
             **encoder,
@@ -296,7 +310,7 @@ class SentimentScopeAI:
             Answer: none
 
             Review: "{review}"
-            Answer:
+            Answer: 
             """.strip()
 
             prompts.append(prompt)
@@ -333,6 +347,8 @@ class SentimentScopeAI:
             issues = []
             for line in result.split('\n'):
                 line = line.strip()
+                if line.lower().startswith('answer:'):
+                    line = line[7:].strip()
                 line = line.lstrip('•-*1234567890.) ')
                 if line and len(line) > 3:
                     issues.append(line)
