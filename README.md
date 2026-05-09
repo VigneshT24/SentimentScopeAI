@@ -48,10 +48,17 @@ SentimentScopeAI is designed to do the heavy lifting:
 
 ## Installation & Usage
 
+If you are using an Intel ARC / Intel XE GPU, BEFORE installing SentimentScopeAI, please install the following:
+```
+pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/xpu](https://download.pytorch.org/whl/xpu)
+```
+
+Once the above installation is complete (if applicable), then follow the instructions below
+
 SentimentScopeAI is distributed as a Python package and can be installed via pip:
 
 ```
-pip install sentimentscopeai
+pip install sentimentscopeai sentencepiece protobuf
 ```
 
 Requirements:
