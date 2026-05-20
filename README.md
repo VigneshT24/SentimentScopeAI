@@ -58,7 +58,7 @@ Once the above installation is complete (if applicable), then follow the instruc
 SentimentScopeAI is distributed as a Python package and can be installed via pip:
 
 ```
-pip install sentimentscopeai sentencepiece protobuf
+pip install sentimentscopeai
 ```
 
 Requirements:
