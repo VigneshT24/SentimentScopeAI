@@ -11,6 +11,7 @@ import warnings
 import logging
 
 os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 os.environ["HF_HUB_VERBOSITY"] = "error"
 os.environ["ACCELERATE_LOG_LEVEL"] = "error"
