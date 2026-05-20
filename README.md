@@ -62,7 +62,7 @@ pip install sentimentscopeai
 ```
 
 Requirements:
-* Python 3.12.0 or higher (IMPORTANT)
+* Python 3.10.0 or higher (IMPORTANT)
 * Internet connection
 
 All required dependencies are automatically installed with the package.
