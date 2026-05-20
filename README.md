@@ -50,7 +50,7 @@ SentimentScopeAI is designed to do the heavy lifting:
 
 If you are using an Intel ARC / Intel XE GPU, BEFORE installing SentimentScopeAI, please install the following:
 ```
-pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/xpu](https://download.pytorch.org/whl/xpu)
+pip install torch==2.8.0 intel-extension-for-pytorch==2.8.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 ```
 
 Once the above installation is complete (if applicable), then follow the instructions below
