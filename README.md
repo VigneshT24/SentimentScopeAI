@@ -48,14 +48,34 @@ SentimentScopeAI is designed to do the heavy lifting:
 
 ## Installation & Usage
 
-If you are using an Intel ARC / Intel XE GPU, BEFORE installing SentimentScopeAI, please install the following:
+If you are using an Intel ARC / Intel XE GPU, please install the following in order:
+```
+pip uninstall torch torchvision torchaudio -y
+```
+
 ```
 pip install torch==2.8.0 intel-extension-for-pytorch==2.8.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 ```
 
-Once the above installation is complete (if applicable), then follow the instructions below
+```
+pip install sentimentscopeai
+```
 
-SentimentScopeAI is distributed as a Python package and can be installed via pip:
+If you are using an NVIDIA GPU with CUDA capabilities, please install the following in order:
+```
+pip uninstall torch torchvision torchaudio -y
+```
+
+```
+# Defaults to cu118 (Safest). Swap to cu121 for newer drivers.
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+```
+pip install sentimentscopeai
+```
+
+If your device is not using NVIDIA or Intel (e.g., AMD or Apple Silicon, etc), there are no support as of now, so just install the following:
 
 ```
 pip install sentimentscopeai
