@@ -1,10 +1,8 @@
-![Sentiment Scope AI Logo](https://github.com/user-attachments/assets/493203ec-ed08-4ad7-8e1a-1c4aced128cb)
-
-
 # SentimentScopeAI
 ## Fine-Grained Review Sentiment Analysis & Insight Generation
 
-SentimentScopeAI is a Python-based NLP system that leverages PyTorch and HuggingFace Transformers (pre-trained models) to analyze, interpret, and point out concerns from customer reviews to help companies improve their product/services.
+| <a href="https://sentimentscopeai.vercel.app/"><img src="https://raw.githubusercontent.com/VigneshT24/SentimentScopeAI/refs/heads/main/website-logo.svg" alt="SentimentScopeAI Website Logo" width="250" /></a> | SentimentScopeAI is a Python-based NLP system that leverages PyTorch and HuggingFace Transformers (pre-trained models) to analyze, interpret, and point out concerns from customer reviews to help companies improve their product/services. <br><br> **[🌐 Visit our official website for more details](https://sentimentscopeai.vercel.app/)** |
+| :---: | :--- |
 
 ## Project Motivation
 
