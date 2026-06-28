@@ -1,4 +1,7 @@
 # SentimentScopeAI
+[![PyPI version](https://img.shields.io/pypi/v/sentimentscopeai.svg)](https://pypi.org/project/dynamic-learning-model/)
+[![Python Version](https://img.shields.io/badge/python-3.12.0%2B-blue)](https://pypi.org/project/dynamic-learning-model/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ## Fine-Grained Review Sentiment Analysis & Insight Generation
 
 | <a href="https://sentimentscopeai.vercel.app/"><img src="https://raw.githubusercontent.com/VigneshT24/SentimentScopeAI/refs/heads/main/website-logo.svg" alt="SentimentScopeAI Website Logo" width="250" /></a> | SentimentScopeAI is a Python-based NLP system that leverages PyTorch and HuggingFace Transformers (pre-trained models) to analyze, interpret, and point out concerns from customer reviews to help companies improve their product/services. <br><br> **[🌐 Visit our official website for more details](https://sentimentscopeai.vercel.app/)** |
